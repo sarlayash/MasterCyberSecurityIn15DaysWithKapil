@@ -28,12 +28,12 @@ export const getFirebaseConfig = () => {
   }
 
   return {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyA-ig9Cd2O-4ZzkHHeUBusBpiiUIoKvrVo",
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "mastercybersecurityin15days.firebaseapp.com",
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "mastercybersecurityin15days",
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "mastercybersecurityin15days.firebasestorage.app",
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "986713142625",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:986713142625:web:4d5affcd14d28e6bd9c120"
   };
 };
 
