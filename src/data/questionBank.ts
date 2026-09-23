@@ -1,4 +1,6 @@
 import { Question } from '../types';
+import { ETHICAL_HACKING_QUESTION_BANK, getEthicalHackingDayAssessment } from './ethicalHackingQuestions';
+export { getEthicalHackingDayAssessment, ETHICAL_HACKING_QUESTION_BANK };
 
 export const BASE_QUESTION_BANK: Question[] = [
   // --- 1. Cybersecurity Fundamentals (EASY/MED/HARD) ---
@@ -1079,8 +1081,11 @@ export function getFullQuestionBank(): Question[] {
 
 // Function to generate a full 100-question mock assessment:
 // Exactly 30 Easy, 40 Medium, 30 Hard questions, non-repeating, randomized.
-export function generate100MockAssessment(): Question[] {
-  const fullBank = getFullQuestionBank();
+export function generate100MockAssessment(track: string = 'cybersecurity'): Question[] {
+  let fullBank = getFullQuestionBank();
+  if (track === 'ethical-hacking') {
+    fullBank = [...ETHICAL_HACKING_QUESTION_BANK, ...fullBank];
+  }
 
   const easyPool = fullBank.filter(q => q.difficulty === 'EASY');
   const mediumPool = fullBank.filter(q => q.difficulty === 'MEDIUM');
@@ -1184,8 +1189,12 @@ export const DAY_TOPIC_MAPPING: Record<number, { title: string; categories: stri
   }
 };
 
-// Generates targeted Mock Assessment questions for a specific Day (Day 01 to Day 15)
+// Generates targeted Mock Assessment questions for a specific Day (Day 01 to Day 15 for both tracks)
 export function getDayMockAssessment(dayNumber: number, count: number = 5): Question[] {
+  if (dayNumber >= 101) {
+    return getEthicalHackingDayAssessment(dayNumber, count);
+  }
+
   const fullBank = getFullQuestionBank();
   const meta = DAY_TOPIC_MAPPING[dayNumber] || DAY_TOPIC_MAPPING[1];
 

@@ -29,7 +29,8 @@ import {
   Target
 } from 'lucide-react';
 import { MODULES_DATA } from '../../data/modulesData';
-import { LearnerProfile, ModuleData, Question, AssessmentAttempt } from '../../types';
+import { ETHICAL_HACKING_MODULES_DATA } from '../../data/ethicalHackingModulesData';
+import { LearnerProfile, ModuleData, Question, AssessmentAttempt, TrackType } from '../../types';
 import { storageService } from '../../services/storageService';
 import { getDayMockAssessment } from '../../data/questionBank';
 
@@ -46,13 +47,26 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
   onLaunchLab,
   initialModuleId = 1
 }) => {
+  const [selectedTrack, setSelectedTrack] = useState<TrackType>(() => {
+    if (initialModuleId >= 101) return 'ethical-hacking';
+    return learner.activeTrack || storageService.getActiveTrack();
+  });
+
+  const activeModules: ModuleData[] = selectedTrack === 'ethical-hacking' 
+    ? ETHICAL_HACKING_MODULES_DATA 
+    : MODULES_DATA;
+
   const [selectedModuleId, setSelectedModuleId] = useState<number>(() => {
-    if (storageService.isModuleUnlocked(initialModuleId, learner.completedModules)) {
+    const modules = (initialModuleId >= 101 || (learner.activeTrack || storageService.getActiveTrack()) === 'ethical-hacking')
+      ? ETHICAL_HACKING_MODULES_DATA 
+      : MODULES_DATA;
+    if (storageService.isModuleUnlocked(initialModuleId, learner.completedModules) && modules.some(m => m.id === initialModuleId)) {
       return initialModuleId;
     }
-    const unlocked = MODULES_DATA.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules));
-    return unlocked.length > 0 ? unlocked[unlocked.length - 1].id : 1;
+    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules));
+    return unlocked.length > 0 ? unlocked[unlocked.length - 1].id : modules[0].id;
   });
+
   const [activeTab, setActiveTab] = useState<'notes' | 'assessment' | 'assignment'>('notes');
   const [searchQuery, setSearchQuery] = useState('');
   const [personalNoteText, setPersonalNoteText] = useState(
@@ -72,6 +86,17 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
     setDayAssessmentResult(null);
   }, [selectedModuleId]);
 
+  const handleSwitchTrack = (newTrack: TrackType) => {
+    setSelectedTrack(newTrack);
+    storageService.setActiveTrack(newTrack);
+    const modules = newTrack === 'ethical-hacking' ? ETHICAL_HACKING_MODULES_DATA : MODULES_DATA;
+    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules));
+    const targetId = unlocked.length > 0 ? unlocked[unlocked.length - 1].id : modules[0].id;
+    setSelectedModuleId(targetId);
+    setPersonalNoteText(learner.personalNotes[targetId] || '');
+    setAssignmentResponse(learner.assignmentSubmissions[targetId]?.learnerResponse || '');
+    setSubmissionStatus(null);
+  };
 
   // Locking and celebration modals state
   const [lockedModalData, setLockedModalData] = useState<{
@@ -84,7 +109,7 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
     nextModule?: ModuleData;
   } | null>(null);
 
-  const currentModule: ModuleData = MODULES_DATA.find(m => m.id === selectedModuleId) || MODULES_DATA[0];
+  const currentModule: ModuleData = activeModules.find(m => m.id === selectedModuleId) || activeModules[0];
   const isCompleted = learner.completedModules.includes(currentModule.id);
   const isBookmarked = learner.bookmarkedModules.includes(currentModule.id);
   const submission = learner.assignmentSubmissions[currentModule.id];
@@ -92,8 +117,8 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
   const handleSelectModule = (id: number) => {
     const isUnlocked = storageService.isModuleUnlocked(id, learner.completedModules);
     if (!isUnlocked) {
-      const target = MODULES_DATA.find(m => m.id === id);
-      const required = MODULES_DATA.find(m => m.id === id - 1);
+      const target = activeModules.find(m => m.id === id);
+      const required = activeModules.find(m => m.id === id - 1);
       if (target && required) {
         setLockedModalData({ targetModule: target, requiredModule: required });
       }
@@ -121,8 +146,8 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
       console.warn("Confetti trigger:", e);
     }
 
-    const completedMod = MODULES_DATA.find(m => m.id === moduleId);
-    const nextMod = MODULES_DATA.find(m => m.id === moduleId + 1);
+    const completedMod = activeModules.find(m => m.id === moduleId);
+    const nextMod = activeModules.find(m => m.id === moduleId + 1);
     if (completedMod) {
       setUnlockedCelebrationModal({
         completedModule: completedMod,
@@ -228,11 +253,57 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
     <div className="min-h-screen bg-[#030712] py-8 px-4 sm:px-6 lg:px-8 text-slate-100 pb-24">
       <div className="max-w-7xl mx-auto space-y-6">
         
+        {/* Track Switcher Bar */}
+        <div className="p-3 sm:p-4 rounded-2xl bg-[#071022] border border-cyan-500/30 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">
+              CURRICULUM TRACK:
+            </span>
+            <div className="inline-flex p-1 rounded-xl bg-slate-950/80 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => handleSwitchTrack('cybersecurity')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  selectedTrack === 'cybersecurity'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md shadow-cyan-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>🛡️</span>
+                <span>Cyber Security (15 Days)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchTrack('ethical-hacking')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  selectedTrack === 'ethical-hacking'
+                    ? 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 text-slate-950 shadow-md shadow-red-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>⚔️</span>
+                <span>Ethical Hacking & Pentesting (15 Days)</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] bg-red-950 text-red-300 border border-red-500/40">NEW</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-mono text-cyan-300">
+              {selectedTrack === 'ethical-hacking' ? 'Offensive Red Team Track' : 'Defensive Blue Team / SOC Track'}
+            </div>
+            <div className="h-4 w-px bg-slate-800" />
+            <div className="text-xs font-mono text-amber-400 font-bold">
+              {activeModules.filter(m => learner.completedModules.includes(m.id)).length} / 15 Unlocked
+            </div>
+          </div>
+        </div>
+
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[#081124] border border-cyan-900/50 shadow-xl no-print">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-semibold mb-1">
-              <span>CYBER SECURITY ZERO-TO-INFINITY</span>
+              <span>{selectedTrack === 'ethical-hacking' ? 'ETHICAL HACKING & PENETRATION TESTING' : 'CYBER SECURITY ZERO-TO-INFINITY'}</span>
               <span>•</span>
               <span className="text-amber-400">15-DAY SEQUENTIAL PROGRESSION</span>
             </div>
@@ -284,10 +355,10 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
             <div className="p-4 rounded-2xl bg-[#081124] border border-cyan-900/50">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                  Course Modules (15 Days)
+                  {selectedTrack === 'ethical-hacking' ? 'Ethical Hacking' : 'Cyber Security'} Modules (15 Days)
                 </span>
                 <span className="text-xs font-mono text-cyan-400">
-                  {learner.completedModules.length} / 15 Done
+                  {activeModules.filter(m => learner.completedModules.includes(m.id)).length} / 15 Done
                 </span>
               </div>
 
@@ -305,7 +376,7 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
 
               {/* Module Buttons List */}
               <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
-                {MODULES_DATA
+                {activeModules
                   .filter(m => 
                     m.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                     m.topics.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))

@@ -20,8 +20,10 @@ import {
   HelpCircle,
   ShieldCheck
 } from 'lucide-react';
-import { Question, AssessmentAttempt, LearnerProfile } from '../../types';
+import { Question, AssessmentAttempt, LearnerProfile, TrackType } from '../../types';
 import { generate100MockAssessment, getDayMockAssessment, DAY_TOPIC_MAPPING } from '../../data/questionBank';
+import { MODULES_DATA } from '../../data/modulesData';
+import { ETHICAL_HACKING_MODULES_DATA } from '../../data/ethicalHackingModulesData';
 import { storageService } from '../../services/storageService';
 
 interface MockAssessmentProps {
@@ -35,6 +37,7 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
 }) => {
   // Test selection modes: 100-MCQ benchmark or Day-by-Day Mock Assessment
   const [examMode, setExamMode] = useState<'100_BENCHMARK' | 'DAY_ASSESSMENT'>('100_BENCHMARK');
+  const [selectedTrack, setSelectedTrack] = useState<TrackType>(() => learner.activeTrack || storageService.getActiveTrack());
   const [selectedDay, setSelectedDay] = useState<number>(1);
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -67,20 +70,26 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
     return () => clearInterval(timer);
   }, [isTestActive, isSubmitted, timeRemainingSeconds]);
 
-  const handleStartTest = (mode: '100_BENCHMARK' | 'DAY_ASSESSMENT' = examMode, dayNum: number = selectedDay) => {
+  const handleStartTest = (
+    mode: '100_BENCHMARK' | 'DAY_ASSESSMENT' = examMode, 
+    dayNum: number = selectedDay,
+    track: TrackType = selectedTrack
+  ) => {
     let qList: Question[] = [];
     let allottedSeconds = 60 * 60; // 60 mins default for 100 MCQs
 
     if (mode === '100_BENCHMARK') {
-      qList = generate100MockAssessment();
+      qList = generate100MockAssessment(track);
       allottedSeconds = 60 * 60;
     } else {
-      qList = getDayMockAssessment(dayNum, 10); // 10 targeted questions for Day assessment
+      const actualDayNumber = track === 'ethical-hacking' ? 100 + dayNum : dayNum;
+      qList = getDayMockAssessment(actualDayNumber, 10); // 10 targeted questions for Day assessment
       allottedSeconds = 15 * 60; // 15 mins for day test
     }
 
     setExamMode(mode);
     setSelectedDay(dayNum);
+    setSelectedTrack(track);
     setQuestions(qList);
     setCurrentIndex(0);
     setUserAnswers({});
@@ -159,7 +168,8 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
 
     // If day assessment passed (>= 70%), unlock next day automatically
     if (examMode === 'DAY_ASSESSMENT' && percentage >= 70) {
-      storageService.updateModuleProgress(selectedDay, true);
+       const actualDayNumber = selectedTrack === 'ethical-hacking' ? 100 + selectedDay : selectedDay;
+       storageService.updateModuleProgress(actualDayNumber, true);
     }
 
     const updated = storageService.getLearner();
@@ -201,8 +211,7 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
           <div className="sticky top-2 z-30 p-3 sm:p-4 rounded-2xl bg-[#09152b]/95 backdrop-blur-md border border-cyan-500/50 shadow-2xl flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>{examMode === '100_BENCHMARK' ? '100-MCQ Corporate Benchmark' : `Day 0${selectedDay} Mock Assessment`}</span>
+                <span>{examMode === '100_BENCHMARK' ? (selectedTrack === 'ethical-hacking' ? '⚔️ 100-MCQ Red Team Benchmark' : '🛡️ 100-MCQ Corporate Cyber Benchmark') : `${selectedTrack === 'ethical-hacking' ? '⚔️' : '🛡️'} Day ${selectedDay < 10 ? `0${selectedDay}` : selectedDay} Mock Assessment`}</span>
               </span>
               <span className="text-slate-500 hidden sm:inline">•</span>
               <span className="text-xs font-mono text-slate-300">
@@ -238,42 +247,77 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
 
         {/* Assessment Header (when not active) */}
         {!isTestActive && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[#081124] border border-cyan-900/50 shadow-xl">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-semibold mb-1">
-                <span>SARLAYASH BENCHMARK</span>
-                <span>•</span>
-                <span className="text-amber-400">CORPORATE ASSESSMENT HUB</span>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[#081124] border border-cyan-900/50 shadow-xl">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-semibold mb-1">
+                  <span>SARLAYASH BENCHMARK</span>
+                  <span>•</span>
+                  <span className="text-amber-400">CORPORATE ASSESSMENT HUB</span>
+                </div>
+                <h1 className="text-2xl font-black text-white">
+                  Cybersecurity Mock Assessment Center
+                </h1>
+                <p className="text-xs text-slate-400 mt-1">
+                  Standardized corporate evaluation: 100-MCQ comprehensive benchmark or day-by-day targeted assessments.
+                </p>
               </div>
-              <h1 className="text-2xl font-black text-white">
-                Cybersecurity Mock Assessment Center
-              </h1>
-              <p className="text-xs text-slate-400 mt-1">
-                Standardized corporate evaluation: 100-MCQ comprehensive benchmark or day-by-day targeted assessments.
-              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setExamMode('100_BENCHMARK')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer ${
+                    examMode === '100_BENCHMARK'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                      : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  100-MCQ Benchmark
+                </button>
+
+                <button
+                  onClick={() => setExamMode('DAY_ASSESSMENT')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer ${
+                    examMode === 'DAY_ASSESSMENT'
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                      : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Day-by-Day Mock Tests
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Assessment Track Switcher Bar */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
               <button
-                onClick={() => setExamMode('100_BENCHMARK')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer ${
-                  examMode === '100_BENCHMARK'
-                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                onClick={() => {
+                  setSelectedTrack('cybersecurity');
+                  setSelectedDay(1);
+                }}
+                className={`flex-1 w-full p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  selectedTrack === 'cybersecurity'
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-md shadow-cyan-900/50'
+                    : 'bg-slate-900/70 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
                 }`}
               >
-                100-MCQ Benchmark
+                <ShieldCheck className="w-4 h-4 text-cyan-300" />
+                <span>🛡️ Cyber Defense Track (Blue Team • Days 01–15)</span>
               </button>
 
               <button
-                onClick={() => setExamMode('DAY_ASSESSMENT')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer ${
-                  examMode === 'DAY_ASSESSMENT'
-                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                onClick={() => {
+                  setSelectedTrack('ethical-hacking');
+                  setSelectedDay(1);
+                }}
+                className={`flex-1 w-full p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  selectedTrack === 'ethical-hacking'
+                    ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white border-rose-400 shadow-md shadow-rose-900/50'
+                    : 'bg-slate-900/70 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
                 }`}
               >
-                Day-by-Day Mock Tests
+                <span>⚔️</span>
+                <span>Ethical Hacking &amp; Pentest Track (Red Team • Days 01–15)</span>
               </button>
             </div>
           </div>
@@ -285,24 +329,43 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
             
             {examMode === '100_BENCHMARK' ? (
               /* Mode 1: 100-Question Corporate Benchmark */
-              <div className="p-8 sm:p-12 rounded-3xl bg-[#081124] border border-cyan-900/50 shadow-2xl text-center space-y-6 max-w-2xl mx-auto animate-in fade-in">
-                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-lg">
+              <div className={`p-8 sm:p-12 rounded-3xl border shadow-2xl text-center space-y-6 max-w-2xl mx-auto animate-in fade-in ${
+                selectedTrack === 'ethical-hacking'
+                  ? 'bg-[#150a12] border-rose-500/40 shadow-rose-950/40'
+                  : 'bg-[#081124] border-cyan-900/50'
+              }`}>
+                <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center mx-auto shadow-lg ${
+                  selectedTrack === 'ethical-hacking'
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                }`}>
                   <Award className="w-8 h-8" />
                 </div>
 
                 <div>
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold mb-3 ${
+                    selectedTrack === 'ethical-hacking'
+                      ? 'bg-rose-950/80 text-rose-300 border border-rose-800/40'
+                      : 'bg-cyan-950 text-cyan-300 border border-cyan-800/40'
+                  }`}>
+                    {selectedTrack === 'ethical-hacking' ? '⚔️ OFFENSIVE SECURITY & RED TEAM TRACK' : '🛡️ DEFENSIVE SECURITY & SOC TRACK'}
+                  </div>
                   <h2 className="text-2xl font-bold text-white">
-                    Ready for the 100-MCQ Corporate Assessment?
+                    {selectedTrack === 'ethical-hacking' 
+                      ? '100-MCQ Offensive Security & Pentest Benchmark' 
+                      : '100-MCQ Corporate Cyber Defense Assessment'}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-400 mt-2 leading-relaxed">
-                    This assessment simulates rigorous enterprise screening standards. Questions span 16 critical cybersecurity domains with no trick phrasing and one defensible best answer.
+                    {selectedTrack === 'ethical-hacking'
+                      ? 'Simulates certified ethical hacker & red team screening benchmarks. Questions span reconnaissance, Nmap, Metasploit, password cracking, OWASP web vulnerabilities, privilege escalation, and defensible reporting.'
+                      : 'This assessment simulates rigorous enterprise screening standards. Questions span 16 critical cybersecurity domains with no trick phrasing and one defensible best answer.'}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 max-w-md mx-auto text-xs font-mono">
                   <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                     <span className="text-slate-400 block text-[10px]">TOTAL QUESTIONS</span>
-                    <span className="text-xl font-bold text-cyan-400">100 MCQs</span>
+                    <span className={`text-xl font-bold ${selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-cyan-400'}`}>100 MCQs</span>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
                     <span className="text-slate-400 block text-[10px]">TIME ALLOTTED</span>
@@ -316,34 +379,51 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
 
                 <div className="pt-4">
                   <button
-                    onClick={() => handleStartTest('100_BENCHMARK')}
-                    className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-sm uppercase tracking-wider shadow-xl shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                    onClick={() => handleStartTest('100_BENCHMARK', 1, selectedTrack)}
+                    className={`px-8 py-4 rounded-xl text-slate-950 font-extrabold text-sm uppercase tracking-wider shadow-xl transition-all transform hover:-translate-y-0.5 cursor-pointer ${
+                      selectedTrack === 'ethical-hacking'
+                        ? 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 hover:from-red-400 hover:to-amber-400 shadow-rose-500/25'
+                        : 'bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/25'
+                    }`}
                   >
-                    Begin 100-Question Assessment
+                    {selectedTrack === 'ethical-hacking' ? 'Begin 100-MCQ Red Team Assessment ⚔️' : 'Begin 100-Question Assessment 🚀'}
                   </button>
                 </div>
               </div>
             ) : (
               /* Mode 2: Day-by-Day Mock Assessment Picker */
-              <div className="p-6 sm:p-8 rounded-3xl bg-[#081124] border border-amber-500/30 shadow-2xl space-y-6 max-w-4xl mx-auto animate-in fade-in">
+              <div className={`p-6 sm:p-8 rounded-3xl border shadow-2xl space-y-6 max-w-4xl mx-auto animate-in fade-in ${
+                selectedTrack === 'ethical-hacking'
+                  ? 'bg-[#150a12] border-rose-500/30'
+                  : 'bg-[#081124] border-amber-500/30'
+              }`}>
                 <div className="text-center space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/60 border border-amber-500/40 text-amber-400 text-xs font-mono">
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono ${
+                    selectedTrack === 'ethical-hacking'
+                      ? 'bg-rose-950/60 border border-rose-500/40 text-rose-400'
+                      : 'bg-amber-950/60 border border-amber-500/40 text-amber-400'
+                  }`}>
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>CURRICULUM MOCK ASSESSMENTS</span>
+                    <span>{selectedTrack === 'ethical-hacking' ? 'ETHICAL HACKING DAY MOCK ASSESSMENTS' : 'CURRICULUM MOCK ASSESSMENTS'}</span>
                   </div>
                   <h2 className="text-2xl font-bold text-white">
                     Select a Day for Targeted Mock Assessment
                   </h2>
                   <p className="text-xs text-slate-400 max-w-lg mx-auto">
-                    Test your mastery of any day from the 15-day workshop. Each test contains 10 domain-specific questions with instant grading and defensible explanations.
+                    Test your mastery of any day from the 15-day {selectedTrack === 'ethical-hacking' ? 'Ethical Hacking' : 'Cyber Security'} curriculum. Each test contains 10 domain-specific questions with instant grading and defensible explanations.
                   </p>
                 </div>
 
                 {/* Day Grid 1-15 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Array.from({ length: 15 }, (_, i) => i + 1).map(dayNum => {
+                    const actualModuleId = selectedTrack === 'ethical-hacking' ? 100 + dayNum : dayNum;
+                    const moduleData = selectedTrack === 'ethical-hacking'
+                      ? ETHICAL_HACKING_MODULES_DATA.find(m => m.id === actualModuleId)
+                      : MODULES_DATA.find(m => m.id === actualModuleId);
+                    
                     const topicMeta = DAY_TOPIC_MAPPING[dayNum];
-                    const isUnlocked = storageService.isModuleUnlocked(dayNum, learner.completedModules);
+                    const isUnlocked = storageService.isModuleUnlocked(actualModuleId, learner.completedModules);
                     const isSelected = selectedDay === dayNum;
 
                     return (
@@ -352,7 +432,9 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                         onClick={() => setSelectedDay(dayNum)}
                         className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                           isSelected
-                            ? 'bg-amber-950/40 border-amber-400 shadow-lg shadow-amber-950/50'
+                            ? selectedTrack === 'ethical-hacking'
+                              ? 'bg-rose-950/40 border-rose-400 shadow-lg shadow-rose-950/50'
+                              : 'bg-amber-950/40 border-amber-400 shadow-lg shadow-amber-950/50'
                             : isUnlocked
                             ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                             : 'bg-slate-950/40 border-slate-900 opacity-60'
@@ -360,18 +442,20 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                       >
                         <div>
                           <div className="flex items-center justify-between mb-1 text-[11px] font-mono">
-                            <span className={isSelected ? 'text-amber-300 font-bold' : 'text-slate-400 font-bold'}>
-                              DAY 0{dayNum}
+                            <span className={isSelected 
+                              ? (selectedTrack === 'ethical-hacking' ? 'text-rose-300 font-bold' : 'text-amber-300 font-bold') 
+                              : 'text-slate-400 font-bold'}>
+                              DAY {dayNum < 10 ? `0${dayNum}` : dayNum}
                             </span>
                             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-cyan-400">
                               10 MCQs • 15m
                             </span>
                           </div>
                           <h4 className="text-sm font-bold text-white line-clamp-1">
-                            {topicMeta?.title || `Day 0${dayNum}`}
+                            {moduleData?.title || topicMeta?.title || `Day ${dayNum}`}
                           </h4>
                           <p className="text-[11px] text-slate-400 mt-1 line-clamp-1">
-                            Topics: {topicMeta?.categories.join(', ')}
+                            {moduleData ? moduleData.category : `Topics: ${topicMeta?.categories.join(', ')}`}
                           </p>
                         </div>
 
@@ -379,7 +463,9 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                           <span className={isUnlocked ? 'text-emerald-400 font-mono' : 'text-slate-500 font-mono'}>
                             {isUnlocked ? '✓ Unlocked' : '🔒 Day Lock'}
                           </span>
-                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                          <span className={`font-bold flex items-center gap-1 ${
+                            selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-amber-400'
+                          }`}>
                             <span>Select</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </span>
@@ -391,10 +477,14 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
 
                 <div className="pt-4 text-center">
                   <button
-                    onClick={() => handleStartTest('DAY_ASSESSMENT', selectedDay)}
-                    className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl shadow-amber-500/25 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                    onClick={() => handleStartTest('DAY_ASSESSMENT', selectedDay, selectedTrack)}
+                    className={`px-8 py-3.5 rounded-xl text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl transition-all transform hover:-translate-y-0.5 cursor-pointer ${
+                      selectedTrack === 'ethical-hacking'
+                        ? 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 hover:from-red-400 hover:to-amber-400 shadow-rose-500/25'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-amber-500/25'
+                    }`}
                   >
-                    Start Day 0{selectedDay} Mock Assessment (10 Questions)
+                    Start Day {selectedDay < 10 ? `0${selectedDay}` : selectedDay} Mock Assessment (10 Questions)
                   </button>
                 </div>
               </div>

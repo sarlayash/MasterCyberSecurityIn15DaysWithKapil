@@ -1,4 +1,5 @@
 export type UserRole = 'learner' | 'admin';
+export type TrackType = 'cybersecurity' | 'ethical-hacking';
 
 export interface LearnerProfile {
   id: string;
@@ -19,6 +20,12 @@ export interface LearnerProfile {
   bookmarkedModules: number[];
   simulatorStats: Record<string, SimulatorMetric>;
   xp: number;
+  activeTrack?: TrackType;
+  ethicalHackingCurrentModuleId?: number;
+  ethicalHackingCompletedModules?: number[];
+  ethicalHackingSubmissions?: Record<number, AssignmentSubmission>;
+  ethicalHackingNotes?: Record<number, string>;
+  ethicalHackingBookmarks?: number[];
 }
 
 export interface SimulatorMetric {
@@ -55,6 +62,7 @@ export interface AssignmentSubmission {
 
 export interface ModuleData {
   id: number;
+  track?: TrackType;
   dayNumber: string; // e.g. "DAY 01"
   title: string;
   shortDesc: string;

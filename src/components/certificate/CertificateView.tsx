@@ -11,7 +11,7 @@ import {
   FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { LearnerProfile } from '../../types';
+import { LearnerProfile, TrackType } from '../../types';
 import { calculateCyberReadiness } from '../../services/scoringEngine';
 import { LetterOfRecommendation } from './LetterOfRecommendation';
 import { BadgesShowcase } from './BadgesShowcase';
@@ -22,15 +22,23 @@ interface CertificateViewProps {
 
 export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => {
   const [credentialTab, setCredentialTab] = useState<'certificate' | 'lor' | 'badges'>('certificate');
+  const [selectedTrack, setSelectedTrack] = useState<TrackType>(learner.activeTrack || 'cybersecurity');
   const [showQrModal, setShowQrModal] = useState(false);
   const readiness = calculateCyberReadiness(learner);
 
-  const certId = `SYM-CSZ-2026-${learner.id.slice(-5).toUpperCase() || '78942'}`;
+  const certId = selectedTrack === 'ethical-hacking'
+    ? `SYM-CEH-2026-${learner.id.slice(-5).toUpperCase() || '78942'}`
+    : `SYM-CSZ-2026-${learner.id.slice(-5).toUpperCase() || '78942'}`;
+
   const completionDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
+
+  const completedModulesCount = selectedTrack === 'ethical-hacking'
+    ? (learner.ethicalHackingCompletedModules || learner.completedModules.filter(id => id >= 101)).length
+    : learner.completedModules.filter(id => id <= 15).length;
 
   useEffect(() => {
     // Fire confetti when viewing certificate
@@ -49,6 +57,33 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
     <div className="min-h-screen bg-[#030712] py-8 px-4 sm:px-6 lg:px-8 text-slate-100 pb-24">
       <div className="max-w-5xl mx-auto space-y-6">
         
+        {/* Track Selector Bar (Hidden on Print) */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 no-print">
+          <button
+            onClick={() => setSelectedTrack('cybersecurity')}
+            className={`flex-1 w-full p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+              selectedTrack === 'cybersecurity'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-cyan-900/50'
+                : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-cyan-300" />
+            <span>🛡️ Cyber Security Zero-To-Infinity (Blue Team)</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedTrack('ethical-hacking')}
+            className={`flex-1 w-full p-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg ${
+              selectedTrack === 'ethical-hacking'
+                ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white border-rose-400 shadow-rose-900/50'
+                : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+            }`}
+          >
+            <span>⚔️</span>
+            <span>Certified Ethical Hacker &amp; Pentest (Red Team)</span>
+          </button>
+        </div>
+
         {/* Credential Navigation Tabs (Hidden on Print) */}
         <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800 no-print">
           <button
@@ -96,10 +131,12 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-[#081124] border border-cyan-900/50 shadow-xl no-print">
               <div>
                 <span className="text-xs font-mono text-cyan-400 font-bold block mb-1">
-                  OFFICIAL WORKSHOP CREDENTIAL
+                  OFFICIAL WORKSHOP CREDENTIAL • {selectedTrack === 'ethical-hacking' ? 'RED TEAM TRACK' : 'BLUE TEAM TRACK'}
                 </span>
                 <h1 className="text-2xl font-black text-white">
-                  Certificate of Completion
+                  {selectedTrack === 'ethical-hacking'
+                    ? 'Certified Ethical Hacker & Penetration Tester'
+                    : 'Certificate of Completion'}
                 </h1>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Verified by SarlaYash Mission • Facilitated by Kapil
@@ -126,7 +163,11 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
             </div>
 
             {/* PRINTABLE HIGH-RESOLUTION CERTIFICATE CANVAS */}
-            <div className="printable-certificate relative p-8 sm:p-14 rounded-3xl bg-[#080f20] border-4 border-amber-500/50 shadow-2xl text-slate-100 overflow-hidden">
+            <div className={`printable-certificate relative p-8 sm:p-14 rounded-3xl border-4 shadow-2xl text-slate-100 overflow-hidden ${
+              selectedTrack === 'ethical-hacking'
+                ? 'bg-[#120710] border-rose-500/60'
+                : 'bg-[#080f20] border-amber-500/50'
+            }`}>
               
               {/* Subtle Guilloche / Watermark Pattern */}
               <div className="absolute inset-0 bg-[radial-gradient(#f59e0b_0.75px,transparent_0.75px)] [background-size:24px_24px] opacity-10 pointer-events-none" />
@@ -134,21 +175,35 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
               <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
               {/* Inner Ornate Border */}
-              <div className="relative z-10 border border-amber-400/40 p-6 sm:p-10 rounded-2xl bg-[#091224]/85 text-center space-y-6">
+              <div className={`relative z-10 border p-6 sm:p-10 rounded-2xl text-center space-y-6 ${
+                selectedTrack === 'ethical-hacking'
+                  ? 'border-rose-400/40 bg-[#150a14]/85'
+                  : 'border-amber-400/40 bg-[#091224]/85'
+              }`}>
                 
                 {/* Certificate Header Branding */}
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-amber-950/60 border border-amber-500/30 text-amber-400 text-xs font-bold font-mono tracking-widest uppercase">
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded border text-xs font-bold font-mono tracking-widest uppercase ${
+                    selectedTrack === 'ethical-hacking'
+                      ? 'bg-rose-950/60 border-rose-500/30 text-rose-400'
+                      : 'bg-amber-950/60 border-amber-500/30 text-amber-400'
+                  }`}>
                     <span>SARLAYASH MISSION</span>
                   </div>
                   <p className="text-xs text-slate-400 tracking-wider">
                     “Legacy of Values. Future of Learning.”
                   </p>
                   <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight uppercase mt-2">
-                    Certificate of Completion
+                    {selectedTrack === 'ethical-hacking'
+                      ? 'Certified Ethical Hacker'
+                      : 'Certificate of Completion'}
                   </h2>
-                  <p className="text-xs sm:text-sm font-semibold text-cyan-400 uppercase tracking-widest font-mono">
-                    CYBER SECURITY ZERO-TO-INFINITY 15-DAY WORKSHOP
+                  <p className={`text-xs sm:text-sm font-semibold uppercase tracking-widest font-mono ${
+                    selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-cyan-400'
+                  }`}>
+                    {selectedTrack === 'ethical-hacking'
+                      ? 'ETHICAL HACKING & PENETRATION TESTING 15-DAY RESIDENCY'
+                      : 'CYBER SECURITY ZERO-TO-INFINITY 15-DAY WORKSHOP'}
                   </p>
                 </div>
 
@@ -161,7 +216,9 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
                     {learner.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed pt-2">
-                    For successfully fulfilling the rigorous 15-day curriculum, demonstrating competency across networking protocols, firewall architecture, Wireshark packet investigation, Linux security, SOC incident triage, and digital forensics.
+                    {selectedTrack === 'ethical-hacking'
+                      ? 'For successfully fulfilling the rigorous 15-day Ethical Hacking curriculum, demonstrating red-team operational proficiency across passive/active reconnaissance, vulnerability assessment, network penetration, social engineering defense, Web Application OWASP exploitation, privilege escalation, and defensible penetration testing documentation.'
+                      : 'For successfully fulfilling the rigorous 15-day curriculum, demonstrating competency across networking protocols, firewall architecture, Wireshark packet investigation, Linux security, SOC incident triage, and digital forensics.'}
                   </p>
                 </div>
 
@@ -177,7 +234,9 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
                     <span className="text-[10px] text-slate-500 block">MODULES MASTERED</span>
-                    <span className="font-bold text-emerald-400">{learner.completedModules.length} / 15 Days</span>
+                    <span className={`font-bold ${selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {completedModulesCount} / 15 Days
+                    </span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
                     <span className="text-[10px] text-slate-500 block">PRACTICAL LABS</span>
@@ -217,7 +276,9 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
                       </span>
                     </div>
                     <p className="text-xs font-bold text-slate-200">Kapil</p>
-                    <p className="text-[10px] text-slate-400">Program Facilitator &amp; Cyber Defender</p>
+                    <p className="text-[10px] text-slate-400">
+                      {selectedTrack === 'ethical-hacking' ? 'Program Facilitator & Ethical Hacker' : 'Program Facilitator & Cyber Defender'}
+                    </p>
                     <p className="text-[10px] text-amber-400 font-mono">SarlaYash Mission</p>
                   </div>
 
@@ -287,7 +348,7 @@ export const CertificateView: React.FC<CertificateViewProps> = ({ learner }) => 
 
         {/* TAB 2: LETTER OF RECOMMENDATION (LOR) */}
         {credentialTab === 'lor' && (
-          <LetterOfRecommendation learner={learner} />
+          <LetterOfRecommendation learner={learner} track={selectedTrack} />
         )}
 
         {/* TAB 3: EARNED BADGES & PNG DOWNLOADER */}

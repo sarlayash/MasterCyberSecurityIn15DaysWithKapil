@@ -9,16 +9,22 @@ import {
   ExternalLink,
   QrCode
 } from 'lucide-react';
-import { LearnerProfile } from '../../types';
+import { LearnerProfile, TrackType } from '../../types';
 import { calculateCyberReadiness } from '../../services/scoringEngine';
 
 interface LetterOfRecommendationProps {
   learner: LearnerProfile;
+  track?: TrackType;
 }
 
-export const LetterOfRecommendation: React.FC<LetterOfRecommendationProps> = ({ learner }) => {
+export const LetterOfRecommendation: React.FC<LetterOfRecommendationProps> = ({ 
+  learner,
+  track = 'cybersecurity'
+}) => {
   const readiness = calculateCyberReadiness(learner);
-  const certId = `LOR-SYM-2026-${learner.id.slice(-6).toUpperCase() || '78942A'}`;
+  const certId = track === 'ethical-hacking'
+    ? `LOR-CEH-2026-${learner.id.slice(-6).toUpperCase() || '78942A'}`
+    : `LOR-SYM-2026-${learner.id.slice(-6).toUpperCase() || '78942A'}`;
   
   const issueDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -91,46 +97,87 @@ export const LetterOfRecommendation: React.FC<LetterOfRecommendationProps> = ({ 
             TO WHOM IT MAY CONCERN / ADMISSIONS &amp; HIRING COMMITTEES
           </h4>
           <p className="text-sm text-slate-700 italic">
-            Subject: Official Letter of Recommendation for <strong>{learner.name}</strong>
+            Subject: Official Letter of Recommendation for <strong>{learner.name}</strong> — {track === 'ethical-hacking' ? 'Certified Ethical Hacker & Penetration Tester' : 'Cyber Security Zero-To-Infinity Practitioner'}
           </p>
         </div>
 
         {/* Formal Endorsement Paragraphs */}
         <div className="space-y-4 text-justify text-sm text-slate-800 leading-relaxed">
-          <p>
-            It is my distinct privilege to write this formal Letter of Recommendation for <strong>{learner.name}</strong>, who has demonstrated exemplary analytical capability, technical discipline, and defensive mastery throughout the intensive <strong>Cyber Security Zero-To-Infinity 15-Day Workshop</strong> conducted under the aegis of SarlaYash Mission.
-          </p>
+          {track === 'ethical-hacking' ? (
+            <>
+              <p>
+                It is my distinct privilege to write this formal Letter of Recommendation for <strong>{learner.name}</strong>, who has demonstrated exemplary analytical capability, technical discipline, and offensive security mastery throughout the intensive <strong>Ethical Hacking &amp; Penetration Testing 15-Day Workshop</strong> conducted under the aegis of SarlaYash Mission.
+              </p>
 
-          <p>
-            The Cyber Security Zero-To-Infinity curriculum enforces a strict sequential progression model designed to replicate the operational pressures of enterprise Security Operations Centers (SOC) and Incident Response teams. Throughout the workshop, {learner.name} demonstrated outstanding competency across both theoretical principles and hands-on laboratory execution:
-          </p>
+              <p>
+                The Ethical Hacking &amp; Penetration Testing curriculum enforces a strict sequential progression model designed to replicate the operational pressures of enterprise Red Teams and offensive security consultancies. Throughout the workshop, {learner.name} demonstrated outstanding competency across both theoretical principles and hands-on laboratory execution:
+              </p>
 
-          {/* Bulleted Competencies */}
-          <ul className="list-disc pl-6 space-y-1.5 text-xs text-slate-800 font-sans">
-            <li>
-              <strong>Network Defense &amp; Protocol Analysis:</strong> Proficient in OSI model mapping, TCP/IP 3-way handshake validation, and packet inspection utilizing Wireshark display filters and PCAP forensic reconstruction.
-            </li>
-            <li>
-              <strong>Perimeter &amp; Systems Security:</strong> Demonstrated practical acumen in stateful packet filtering, firewall rule-base optimization (avoiding rule shadowing), and Linux access control mechanisms (octal permissions, SUID security, and audit logging).
-            </li>
-            <li>
-              <strong>SOC Alert Triage &amp; Incident Response:</strong> Executed Tier-1 SIEM alert triage, distinguished false positives from authentic threats (brute-force spraying, port scans), and formulated structured containment workflows adhering to NIST SP 800-61 guidelines.
-            </li>
-            <li>
-              <strong>Application Security &amp; Cryptography:</strong> Solid foundation in OWASP Top 10 vulnerabilities (SQL Injection, XSS, CSRF), parameterized query defenses, AES/RSA cryptographic fundamentals, and Public Key Infrastructure (PKI).
-            </li>
-          </ul>
+              {/* Bulleted Competencies for Ethical Hacking */}
+              <ul className="list-disc pl-6 space-y-1.5 text-xs text-slate-800 font-sans">
+                <li>
+                  <strong>Reconnaissance &amp; Attack Surface Enumeration:</strong> Proficient in OSINT methodologies, DNS zone transfer queries, passive footprinting, and advanced Nmap scanning scripts (`-sS`, `-sV`, `--script vuln`) to identify exposed services and vulnerable topologies.
+                </li>
+                <li>
+                  <strong>Network Penetration &amp; Credential Exploitation:</strong> Acquired practical hands-on acumen in Metasploit framework exploitation, automated password cracking using Hashcat and John the Ripper, network protocol auditing (SMB, RPC, SSH), and credential spraying defense.
+                </li>
+                <li>
+                  <strong>Web Application Penetration Testing (OWASP Top 10):</strong> Demonstrated precision in discovering and ethically validating critical web flaws including SQL Injection (Union-based, Boolean, and automated sqlmap validation), Cross-Site Scripting (XSS), Broken Access Control, and CSRF.
+                </li>
+                <li>
+                  <strong>Privilege Escalation &amp; Defensible Reporting:</strong> Mastered Linux and Windows privilege escalation vectors (SUID bit misconfigurations, sudo rights, unquoted service paths), defensive evasion, and drafting formal executive-level remediation reports adhering to NIST and PTES guidelines.
+                </li>
+              </ul>
 
-          <p>
-            In standardized objective evaluations, {learner.name} attained a <strong>Cyber Readiness Index of {readiness.overallPercentage}%</strong>, earning the distinction of <strong>Level {readiness.currentLevel.levelNumber}: {readiness.currentLevel.levelName}</strong>. 
-            {latestAssessment && (
-              <span> Furthermore, in the comprehensive 100-MCQ Corporate Cyber Benchmark Assessment, {learner.name} recorded an impressive score of <strong>{latestAssessment.percentage}%</strong>, surpassing the competitive corporate threshold.</span>
-            )}
-          </p>
+              <p>
+                In standardized objective evaluations, {learner.name} attained a <strong>Cyber Readiness Index of {readiness.overallPercentage}%</strong>, earning the distinction of <strong>Level {readiness.currentLevel.levelNumber}: {readiness.currentLevel.levelName}</strong>. 
+                {latestAssessment && (
+                  <span> Furthermore, in the comprehensive 100-MCQ Corporate Cyber Benchmark Assessment, {learner.name} recorded an impressive score of <strong>{latestAssessment.percentage}%</strong>, surpassing the competitive corporate threshold.</span>
+                )}
+              </p>
 
-          <p>
-            Beyond technical prowess, {learner.name} exhibited exceptional ethical integrity, rapid problem-solving, and a dedication to continuous professional growth. I endorse {learner.name} with complete confidence for cybersecurity analyst positions, SOC operational roles, network defense apprenticeships, or specialized graduate studies.
-          </p>
+              <p>
+                Beyond technical prowess, {learner.name} exhibited exceptional ethical integrity, strict adherence to Rules of Engagement (ROE), and responsible disclosure practices. I endorse {learner.name} with complete confidence for Junior Penetration Tester, Vulnerability Analyst, Red Team Associate, or Application Security Engineer positions.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                It is my distinct privilege to write this formal Letter of Recommendation for <strong>{learner.name}</strong>, who has demonstrated exemplary analytical capability, technical discipline, and defensive mastery throughout the intensive <strong>Cyber Security Zero-To-Infinity 15-Day Workshop</strong> conducted under the aegis of SarlaYash Mission.
+              </p>
+
+              <p>
+                The Cyber Security Zero-To-Infinity curriculum enforces a strict sequential progression model designed to replicate the operational pressures of enterprise Security Operations Centers (SOC) and Incident Response teams. Throughout the workshop, {learner.name} demonstrated outstanding competency across both theoretical principles and hands-on laboratory execution:
+              </p>
+
+              {/* Bulleted Competencies for Cyber Defense */}
+              <ul className="list-disc pl-6 space-y-1.5 text-xs text-slate-800 font-sans">
+                <li>
+                  <strong>Network Defense &amp; Protocol Analysis:</strong> Proficient in OSI model mapping, TCP/IP 3-way handshake validation, and packet inspection utilizing Wireshark display filters and PCAP forensic reconstruction.
+                </li>
+                <li>
+                  <strong>Perimeter &amp; Systems Security:</strong> Demonstrated practical acumen in stateful packet filtering, firewall rule-base optimization (avoiding rule shadowing), and Linux access control mechanisms (octal permissions, SUID security, and audit logging).
+                </li>
+                <li>
+                  <strong>SOC Alert Triage &amp; Incident Response:</strong> Executed Tier-1 SIEM alert triage, distinguished false positives from authentic threats (brute-force spraying, port scans), and formulated structured containment workflows adhering to NIST SP 800-61 guidelines.
+                </li>
+                <li>
+                  <strong>Application Security &amp; Cryptography:</strong> Solid foundation in OWASP Top 10 vulnerabilities (SQL Injection, XSS, CSRF), parameterized query defenses, AES/RSA cryptographic fundamentals, and Public Key Infrastructure (PKI).
+                </li>
+              </ul>
+
+              <p>
+                In standardized objective evaluations, {learner.name} attained a <strong>Cyber Readiness Index of {readiness.overallPercentage}%</strong>, earning the distinction of <strong>Level {readiness.currentLevel.levelNumber}: {readiness.currentLevel.levelName}</strong>. 
+                {latestAssessment && (
+                  <span> Furthermore, in the comprehensive 100-MCQ Corporate Cyber Benchmark Assessment, {learner.name} recorded an impressive score of <strong>{latestAssessment.percentage}%</strong>, surpassing the competitive corporate threshold.</span>
+                )}
+              </p>
+
+              <p>
+                Beyond technical prowess, {learner.name} exhibited exceptional ethical integrity, rapid problem-solving, and a dedication to continuous professional growth. I endorse {learner.name} with complete confidence for cybersecurity analyst positions, SOC operational roles, network defense apprenticeships, or specialized graduate studies.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Quantified Telemetry Summary Card */}
@@ -145,7 +192,11 @@ export const LetterOfRecommendation: React.FC<LetterOfRecommendationProps> = ({ 
           </div>
           <div>
             <span className="text-[10px] text-slate-500 uppercase block">CURRICULUM MODULES</span>
-            <span className="font-bold text-emerald-700">{learner.completedModules.length} / 15 Completed</span>
+            <span className="font-bold text-emerald-700">
+              {track === 'ethical-hacking' 
+                ? `${(learner.ethicalHackingCompletedModules || learner.completedModules.filter(id => id >= 101)).length} / 15 Completed`
+                : `${learner.completedModules.filter(id => id <= 15).length} / 15 Completed`}
+            </span>
           </div>
           <div>
             <span className="text-[10px] text-slate-500 uppercase block">BENCHMARK SCORE</span>

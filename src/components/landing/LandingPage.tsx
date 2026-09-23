@@ -14,6 +14,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { MODULES_DATA } from '../../data/modulesData';
+import { ETHICAL_HACKING_MODULES_DATA } from '../../data/ethicalHackingModulesData';
+import { TrackType } from '../../types';
 
 interface LandingPageProps {
   onOpenGoogleAuth: () => void;
@@ -32,6 +34,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onLaunchSimulator,
   onOpenTour
 }) => {
+  const [selectedTrack, setSelectedTrack] = React.useState<TrackType>('cybersecurity');
+
   const labHighlights = [
     { id: 'cmd', name: 'Command Prompt Simulator', icon: '🖥', desc: 'ipconfig, ping, tracert, nslookup, netstat, arp, whoami' },
     { id: 'linux', name: 'Linux Terminal Simulator', icon: '🐧', desc: 'POSIX permissions, processes, /var/log/auth.log audits' },
@@ -43,6 +47,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     { id: 'phishing', name: 'Phishing Email Analyzer', icon: '🎣', desc: 'Raw header inspection, SPF/DKIM, $18.5M inheritance case' },
     { id: 'network', name: 'Network Diagnostics', icon: '🌐', desc: 'Interactive topology with animated packet flows' }
   ];
+
+  const displayedModules = selectedTrack === 'ethical-hacking' ? ETHICAL_HACKING_MODULES_DATA : MODULES_DATA;
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 overflow-x-hidden">
@@ -259,34 +265,79 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
             <div>
               <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest font-mono">
-                CURRICULUM ARCHITECTURE
+                CURRICULUM ARCHITECTURE • DUAL TRACK ACADEMY
               </span>
               <h3 className="text-3xl sm:text-4xl font-extrabold text-white mt-2">
-                15-Day Zero-to-Infinity Journey
+                15-Day Mastery Roadmaps
               </h3>
             </div>
             <p className="text-slate-400 text-xs sm:text-sm max-w-md mt-4 md:mt-0">
-              Methodically paced from basic awareness to complex incident response. <span className="text-amber-400 font-semibold block mt-1">Strict sequential progression: All learners begin at Day 01; subsequent days unlock one-by-one upon assignment completion.</span>
+              Methodically paced from zero awareness to corporate SOC & Penetration Testing execution. <span className="text-amber-400 font-semibold block mt-1">Strict sequential progression: All learners begin at Day 01; subsequent days unlock one-by-one upon verified completion.</span>
             </p>
           </div>
 
+          {/* Dual Track Switcher Pill Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10 max-w-2xl mx-auto">
+            <button
+              onClick={() => setSelectedTrack('cybersecurity')}
+              className={`w-full sm:w-1/2 p-3.5 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-lg ${
+                selectedTrack === 'cybersecurity'
+                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border-cyan-400 shadow-cyan-900/50 scale-[1.02]'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <Shield className="w-4 h-4 text-cyan-300" />
+              <div className="text-left">
+                <div className="font-extrabold">Cyber Security Zero-To-Infinity</div>
+                <div className="text-[10px] font-mono opacity-80 font-normal">15 Days • Defensive / Blue Team</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setSelectedTrack('ethical-hacking')}
+              className={`w-full sm:w-1/2 p-3.5 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-lg ${
+                selectedTrack === 'ethical-hacking'
+                  ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white border-rose-400 shadow-rose-900/50 scale-[1.02]'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <span className="text-base">⚔️</span>
+              <div className="text-left">
+                <div className="font-extrabold">Ethical Hacking &amp; Pentest</div>
+                <div className="text-[10px] font-mono opacity-80 font-normal">15 Days • Offensive / Red Team</div>
+              </div>
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {MODULES_DATA.map((module) => (
+            {displayedModules.map((module) => (
               <div
                 key={module.id}
                 onClick={() => onSelectModule ? onSelectModule(module.id) : onOpenGoogleAuth()}
-                className="p-4 rounded-xl bg-[#081124] border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer group flex flex-col justify-between hover:bg-slate-900/90"
+                className={`p-4 rounded-xl border transition-all cursor-pointer group flex flex-col justify-between hover:scale-[1.01] ${
+                  selectedTrack === 'ethical-hacking'
+                    ? 'bg-[#150a12]/70 border-rose-950 hover:border-rose-500/50 hover:bg-slate-900/90'
+                    : 'bg-[#081124] border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900/90'
+                }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-mono text-amber-400 font-bold">
+                    <span className={`text-[11px] font-mono font-bold ${
+                      selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-amber-400'
+                    }`}>
                       {module.dayNumber}
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 font-medium">
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
+                      selectedTrack === 'ethical-hacking'
+                        ? 'bg-rose-950/80 text-rose-300 border border-rose-800/40'
+                        : 'bg-cyan-950 text-cyan-400'
+                    }`}>
                       {module.category}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors line-clamp-1">
+                  <h4 className={`text-sm font-bold text-white transition-colors line-clamp-1 ${
+                    selectedTrack === 'ethical-hacking' ? 'group-hover:text-rose-300' : 'group-hover:text-cyan-300'
+                  }`}>
                     {module.title}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
@@ -294,7 +345,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </p>
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500 group-hover:text-cyan-400">
+                <div className={`mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-500 ${
+                  selectedTrack === 'ethical-hacking' ? 'group-hover:text-rose-400' : 'group-hover:text-cyan-400'
+                }`}>
                   <span>{module.estimatedMinutes} mins</span>
                   <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </div>

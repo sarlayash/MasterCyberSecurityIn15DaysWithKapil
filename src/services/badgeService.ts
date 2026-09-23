@@ -151,6 +151,15 @@ export const ALL_BADGE_DEFINITIONS: Omit<EarnedBadgeInfo, 'isUnlocked' | 'unlock
     description: 'Maintained continuous dedicated cybersecurity learning discipline.',
     criteriaMet: 'Maintain an active daily learning streak',
     badgeRank: 'BRONZE'
+  },
+  {
+    id: 'badge-redteam-operator',
+    title: 'Certified Red Team Specialist',
+    category: 'milestone',
+    icon: '⚔️',
+    description: 'Demonstrated offensive red-team competencies across penetration testing modules.',
+    criteriaMet: 'Complete 3+ Ethical Hacking modules or score >= 70% in assessments',
+    badgeRank: 'PLATINUM'
   }
 ];
 
@@ -165,6 +174,7 @@ export function getLearnerBadges(learner: LearnerProfile): EarnedBadgeInfo[] {
   const hasEliteAssessment = assessments.some(a => a.percentage >= 90);
   const labCount = Object.keys(learner.simulatorStats || {}).length;
   const hasStreak = learner.streakDays >= 1;
+  const ehModulesCount = (learner.ethicalHackingCompletedModules || learner.completedModules.filter(id => id >= 101)).length;
 
   return ALL_BADGE_DEFINITIONS.map(badge => {
     let isUnlocked = false;
@@ -181,6 +191,8 @@ export function getLearnerBadges(learner: LearnerProfile): EarnedBadgeInfo[] {
       isUnlocked = labCount >= 5;
     } else if (badge.id === 'badge-streak-fire') {
       isUnlocked = hasStreak;
+    } else if (badge.id === 'badge-redteam-operator') {
+      isUnlocked = ehModulesCount >= 3 || (ehModulesCount >= 1 && passedAssessmentsCount >= 1);
     }
 
     return {

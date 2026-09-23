@@ -1,9 +1,12 @@
-import { LearnerProfile, Announcement, AssignmentSubmission } from '../types';
+import { LearnerProfile, Announcement, AssignmentSubmission, TrackType, ModuleData } from '../types';
 import { syncLearnerToFirestore } from './firebase';
+import { MODULES_DATA } from '../data/modulesData';
+import { ETHICAL_HACKING_MODULES_DATA } from '../data/ethicalHackingModulesData';
 
 const STORAGE_KEY_LEARNER = 'sym_cyber_current_learner';
 const STORAGE_KEY_ANNOUNCEMENTS = 'sym_cyber_announcements';
 const STORAGE_KEY_REGISTERED_LEARNERS = 'sym_cyber_registered_learners';
+const STORAGE_KEY_ACTIVE_TRACK = 'sym_cyber_active_track';
 
 // Strict fresh learner starting at Day 1 with all other days locked
 export const DEFAULT_LEARNER: LearnerProfile = {
@@ -15,8 +18,11 @@ export const DEFAULT_LEARNER: LearnerProfile = {
   lastLoginTimestamp: new Date().toISOString(),
   streakDays: 1,
   lastActiveDate: new Date().toISOString().split('T')[0],
+  activeTrack: 'cybersecurity',
   currentModuleId: 1, // Strictly Day 1
   completedModules: [], // Strictly Day 2-15 locked until Day 1 is completed!
+  ethicalHackingCurrentModuleId: 101, // Strictly Day 1 of Ethical Hacking
+  ethicalHackingCompletedModules: [],
   assessmentScores: [],
   completedLabs: [],
   assignmentSubmissions: {},
@@ -142,8 +148,33 @@ export const storageService = {
     }
   },
 
+  getActiveTrack(): TrackType {
+    const learner = this.getLearner();
+    if (learner && learner.activeTrack) {
+      return learner.activeTrack;
+    }
+    const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_TRACK);
+    if (saved === 'ethical-hacking' || saved === 'cybersecurity') {
+      return saved as TrackType;
+    }
+    return 'cybersecurity';
+  },
+
+  setActiveTrack(track: TrackType): void {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_TRACK, track);
+    const learner = this.getLearner();
+    if (learner) {
+      learner.activeTrack = track;
+      this.saveLearner(learner);
+    }
+  },
+
+  getModulesForTrack(track: TrackType): ModuleData[] {
+    return track === 'ethical-hacking' ? ETHICAL_HACKING_MODULES_DATA : MODULES_DATA;
+  },
+
   isModuleUnlocked(moduleId: number, completedModules: number[]): boolean {
-    if (moduleId === 1) return true; // Day 1 is always unlocked
+    if (moduleId === 1 || moduleId === 101) return true; // Day 1 for either track is always unlocked!
     // Day N is unlocked ONLY IF Day N-1 has been successfully completed!
     return completedModules.includes(moduleId - 1);
   },
@@ -156,9 +187,20 @@ export const storageService = {
         learner.completedModules.push(moduleId);
         learner.xp += 150;
       }
-      learner.currentModuleId = Math.min(15, Math.max(learner.currentModuleId, moduleId + 1));
+      if (moduleId >= 101) {
+        learner.ethicalHackingCompletedModules = learner.ethicalHackingCompletedModules || [];
+        if (!learner.ethicalHackingCompletedModules.includes(moduleId)) {
+          learner.ethicalHackingCompletedModules.push(moduleId);
+        }
+        learner.ethicalHackingCurrentModuleId = Math.min(115, Math.max(learner.ethicalHackingCurrentModuleId || 101, moduleId + 1));
+      } else {
+        learner.currentModuleId = Math.min(15, Math.max(learner.currentModuleId, moduleId + 1));
+      }
     } else {
       learner.completedModules = learner.completedModules.filter(m => m !== moduleId);
+      if (moduleId >= 101 && learner.ethicalHackingCompletedModules) {
+        learner.ethicalHackingCompletedModules = learner.ethicalHackingCompletedModules.filter(m => m !== moduleId);
+      }
     }
     this.saveLearner(learner);
     return learner;

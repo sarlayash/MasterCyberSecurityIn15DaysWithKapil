@@ -36,7 +36,9 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
   const cpi = calculateCyberPerformanceIndex(learner);
   const recommendations = generateLearningRecommendations(learner);
 
-  const isCertificateEligible = learner.completedModules.length >= 15 && readiness.overallPercentage >= 70;
+  const csCompletedCount = learner.completedModules.filter(id => id <= 15).length;
+  const ehCompletedCount = (learner.ethicalHackingCompletedModules || learner.completedModules.filter(id => id >= 101)).length;
+  const isCertificateEligible = (csCompletedCount >= 15 || ehCompletedCount >= 15) && readiness.overallPercentage >= 70;
 
   return (
     <div className="min-h-screen bg-[#030712] py-8 px-4 sm:px-6 lg:px-8 text-slate-100 pb-24">
@@ -163,21 +165,118 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
           </div>
         </div>
 
+        {/* 2.5 DUAL TRACK ACADEMY PROGRESS OVERVIEW */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Track 1: Cyber Security Zero-To-Infinity */}
+          <div className="p-6 rounded-3xl bg-gradient-to-br from-[#081329] to-[#070e1e] border border-cyan-500/40 shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/50 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>DEFENSIVE SECURITY TRACK</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-amber-400">
+                  {csCompletedCount} / 15 Done
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white">
+                Cyber Security Zero-To-Infinity
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                Foundations, networking, firewalls, Wireshark, Linux hardening, SOC triage, and incident response.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <span>PROGRESS</span>
+                <span className="text-cyan-400 font-bold">{Math.round((csCompletedCount / 15) * 100)}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                  style={{ width: `${Math.min(100, Math.round((csCompletedCount / 15) * 100))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-mono">
+                Current: <strong className="text-white">Day {learner.currentModuleId}</strong>
+              </span>
+              <button
+                onClick={() => onNavigateTab('curriculum', learner.currentModuleId || 1)}
+                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20"
+              >
+                <span>Continue Track</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Track 2: Ethical Hacking & Penetration Testing */}
+          <div className="p-6 rounded-3xl bg-gradient-to-br from-[#190916] to-[#0f050d] border border-rose-500/40 shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-800/50 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <span>⚔️</span>
+                  <span>OFFENSIVE SECURITY TRACK</span>
+                </span>
+                <span className="text-xs font-mono font-bold text-rose-400">
+                  {ehCompletedCount} / 15 Done
+                </span>
+              </div>
+              <h3 className="text-lg font-black text-white">
+                Ethical Hacking &amp; Penetration Testing
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                Reconnaissance, Nmap, Metasploit, password attacks, OWASP Top 10, privilege escalation, and red team reporting.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                <span>PROGRESS</span>
+                <span className="text-rose-400 font-bold">{Math.round((ehCompletedCount / 15) * 100)}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-red-500 via-rose-500 to-amber-500"
+                  style={{ width: `${Math.min(100, Math.round((ehCompletedCount / 15) * 100))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-mono">
+                Current: <strong className="text-white">Day {(learner.ethicalHackingCurrentModuleId || 101) - 100}</strong>
+              </span>
+              <button
+                onClick={() => onNavigateTab('curriculum', learner.ethicalHackingCurrentModuleId || 101)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-500/20"
+              >
+                <span>Enter Red Team</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+        </div>
+
         {/* 3. CORE METRIC KPI CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           
           <div className="p-4 rounded-2xl bg-[#091326] border border-cyan-900/40">
-            <span className="text-xs text-slate-400 block font-medium">Current Module</span>
-            <div className="text-xl font-bold text-white mt-1">Day {learner.currentModuleId}</div>
-            <span className="text-[11px] text-cyan-400 mt-1 block">In Progress</span>
+            <span className="text-xs text-slate-400 block font-medium">Cyber Defense</span>
+            <div className="text-xl font-bold text-white mt-1">{csCompletedCount} / 15</div>
+            <span className="text-[11px] text-cyan-400 mt-1 block">Day {learner.currentModuleId} active</span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#091326] border border-cyan-900/40">
-            <span className="text-xs text-slate-400 block font-medium">Modules Completed</span>
-            <div className="text-xl font-bold text-white mt-1">{learner.completedModules.length} / 15</div>
-            <span className="text-[11px] text-slate-400 mt-1 block">
-              {Math.round((learner.completedModules.length / 15) * 100)}% Syllabus
-            </span>
+          <div className="p-4 rounded-2xl bg-[#091326] border border-rose-900/40">
+            <span className="text-xs text-slate-400 block font-medium">Ethical Hacking</span>
+            <div className="text-xl font-bold text-rose-400 mt-1">{ehCompletedCount} / 15</div>
+            <span className="text-[11px] text-rose-400 mt-1 block">Day {(learner.ethicalHackingCurrentModuleId || 101) - 100} active</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#091326] border border-cyan-900/40">
@@ -185,13 +284,13 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
             <div className="text-xl font-bold text-white mt-1">
               {learner.assessmentScores[0] ? `${learner.assessmentScores[0].percentage}%` : 'Pending'}
             </div>
-            <span className="text-[11px] text-amber-400 mt-1 block">100-MCQ Engine</span>
+            <span className="text-[11px] text-amber-400 mt-1 block">Corporate Engine</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#091326] border border-cyan-900/40">
             <span className="text-xs text-slate-400 block font-medium">Assignments</span>
             <div className="text-xl font-bold text-white mt-1">
-              {Object.keys(learner.assignmentSubmissions).length} / 15
+              {Object.keys(learner.assignmentSubmissions).length} Done
             </div>
             <span className="text-[11px] text-emerald-400 mt-1 block">Verified Work</span>
           </div>
