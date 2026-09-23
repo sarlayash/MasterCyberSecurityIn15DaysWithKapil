@@ -51,7 +51,13 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEY_LEARNER);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // If it's a legacy unverified dummy bypass account, purge it immediately
+        if (parsed.id?.startsWith('google-') || parsed.email === 'ka20154112@wipro.com') {
+          localStorage.removeItem(STORAGE_KEY_LEARNER);
+          return DEFAULT_LEARNER;
+        }
+        return parsed;
       }
     } catch (e) {
       console.error("Storage read error", e);
@@ -69,14 +75,29 @@ export const storageService = {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // Strictly filter out any mock/seed learners
-          list = parsed.filter(l => l && l.id && !l.id.startsWith('learner-00') && !l.email?.includes('placeholder'));
+          // Strictly filter out any mock/seed learners and any unverified local bypass IDs
+          list = parsed.filter(l => 
+            l && 
+            l.id && 
+            !l.id.startsWith('learner-00') && 
+            !l.id.startsWith('google-') && 
+            l.email !== 'ka20154112@wipro.com' &&
+            !l.email?.includes('placeholder')
+          );
         }
       }
 
       // Check current active learner session - if it's a real learner who signed up, ensure they are in the list!
       const current = this.getLearner();
-      if (current && current.id && current.id !== 'learner-initial' && current.email && !current.email.includes('learner@sarlayash.org')) {
+      if (
+        current && 
+        current.id && 
+        current.id !== 'learner-initial' && 
+        !current.id.startsWith('google-') &&
+        current.email && 
+        !current.email.includes('learner@sarlayash.org') &&
+        current.email !== 'ka20154112@wipro.com'
+      ) {
         const existingIdx = list.findIndex(l => l.id === current.id || l.email.toLowerCase() === current.email.toLowerCase());
         if (existingIdx >= 0) {
           list[existingIdx] = current;
@@ -253,5 +274,18 @@ export const storageService = {
     }
 
     return resetTarget;
+  },
+
+  deleteSpecificLearner(learnerId: string): void {
+    try {
+      const all = this.getAllRegisteredLearners().filter(l => l.id !== learnerId);
+      localStorage.setItem(STORAGE_KEY_REGISTERED_LEARNERS, JSON.stringify(all));
+      const current = this.getLearner();
+      if (current && current.id === learnerId) {
+        localStorage.removeItem(STORAGE_KEY_LEARNER);
+      }
+    } catch (e) {
+      console.error("Storage delete learner error", e);
+    }
   }
 };

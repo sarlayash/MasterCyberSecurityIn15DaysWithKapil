@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { LearnerProfile } from '../types';
 
-// Default Firebase Configuration (can be overridden with Vite env variables or user setup)
+// Firebase Configuration for project: mastercybersecurityin15days
 export const getFirebaseConfig = () => {
   const saved = localStorage.getItem('sym_firebase_custom_config');
   if (saved) {
@@ -28,22 +28,77 @@ export const getFirebaseConfig = () => {
   }
 
   return {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD-demo-placeholder-sarlayash-csz",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "sarlayash-cybersecurity.firebaseapp.com",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "sarlayash-cybersecurity",
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "sarlayash-cybersecurity.appspot.com",
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "102938475612",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:102938475612:web:98abc123def456"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "mastercybersecurityin15days.firebaseapp.com",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "mastercybersecurityin15days",
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "mastercybersecurityin15days.firebasestorage.app",
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
   };
 };
 
 export const isConfiguredWithValidKey = (): boolean => {
   const cfg = getFirebaseConfig();
   if (!cfg.apiKey) return false;
-  if (cfg.apiKey.includes('placeholder') || cfg.apiKey.includes('demo') || cfg.apiKey.includes('dummy')) {
-    return false;
-  }
   return cfg.apiKey.startsWith('AIza') && cfg.apiKey.length > 25;
+};
+
+// Smart parser: extracts apiKey, appId, etc. from raw snippet or JSON
+export const parseAndSaveFirebaseConfig = (rawInput: string): { success: boolean; error?: string } => {
+  const text = rawInput.trim();
+  if (!text) return { success: false, error: "Configuration cannot be empty." };
+
+  let extractedConfig: Record<string, string> = {};
+
+  // If user pasted JSON
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      extractedConfig = JSON.parse(text);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // If user pasted JavaScript code like `const firebaseConfig = { apiKey: "...", ... }`
+  if (!extractedConfig.apiKey) {
+    const apiKeyMatch = text.match(/apiKey\s*[:=]\s*["']([^"']+)["']/i);
+    const authDomainMatch = text.match(/authDomain\s*[:=]\s*["']([^"']+)["']/i);
+    const projectIdMatch = text.match(/projectId\s*[:=]\s*["']([^"']+)["']/i);
+    const storageBucketMatch = text.match(/storageBucket\s*[:=]\s*["']([^"']+)["']/i);
+    const messagingSenderIdMatch = text.match(/messagingSenderId\s*[:=]\s*["']([^"']+)["']/i);
+    const appIdMatch = text.match(/appId\s*[:=]\s*["']([^"']+)["']/i);
+
+    if (apiKeyMatch) extractedConfig.apiKey = apiKeyMatch[1];
+    if (authDomainMatch) extractedConfig.authDomain = authDomainMatch[1];
+    if (projectIdMatch) extractedConfig.projectId = projectIdMatch[1];
+    if (storageBucketMatch) extractedConfig.storageBucket = storageBucketMatch[1];
+    if (messagingSenderIdMatch) extractedConfig.messagingSenderId = messagingSenderIdMatch[1];
+    if (appIdMatch) extractedConfig.appId = appIdMatch[1];
+  }
+
+  // If user pasted raw API key starting with AIza
+  if (!extractedConfig.apiKey && text.startsWith('AIza') && text.length > 25 && !text.includes(' ') && !text.includes('{')) {
+    extractedConfig.apiKey = text;
+  }
+
+  if (!extractedConfig.apiKey || !extractedConfig.apiKey.startsWith('AIza')) {
+    return { 
+      success: false, 
+      error: "Could not detect a valid Firebase API Key starting with 'AIzaSy...'. Please copy your Web App config snippet from Firebase Console (Project Settings > General > Your apps)." 
+    };
+  }
+
+  const finalConfig = {
+    apiKey: extractedConfig.apiKey,
+    authDomain: extractedConfig.authDomain || "mastercybersecurityin15days.firebaseapp.com",
+    projectId: extractedConfig.projectId || "mastercybersecurityin15days",
+    storageBucket: extractedConfig.storageBucket || "mastercybersecurityin15days.firebasestorage.app",
+    messagingSenderId: extractedConfig.messagingSenderId || "",
+    appId: extractedConfig.appId || ""
+  };
+
+  localStorage.setItem('sym_firebase_custom_config', JSON.stringify(finalConfig));
+  return { success: true };
 };
 
 const firebaseConfig = getFirebaseConfig();
@@ -121,61 +176,15 @@ export const syncLearnerToFirestore = async (learner: LearnerProfile): Promise<v
   }
 };
 
-// Official Google Sign-In via Firebase Popup
+// Official Google Sign-In via Firebase Popup (100% Genuine Google Accounts)
 export const signInWithGoogleFirebase = async (): Promise<LearnerProfile> => {
   if (!isConfiguredWithValidKey()) {
-    const error: any = new Error("Firebase API key is not configured or is invalid. Please configure your Firebase Web API key or use direct Google verification.");
-    error.code = 'auth/api-key-not-valid';
+    const error: any = new Error("Firebase Web API key is not yet configured for project 'mastercybersecurityin15days'. Please link your Firebase Web App credentials.");
+    error.code = 'auth/missing-api-key';
     throw error;
   }
   const result = await signInWithPopup(auth, googleProvider);
   return await getOrCreateLearnerInFirestore(result.user);
-};
-
-// Create verified Google Learner Profile (starts strictly at Day 1, syncs to Firestore if configured)
-export const createVerifiedGoogleLearner = async (name: string, email: string): Promise<LearnerProfile> => {
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanName = name.trim() || "Google Verified Learner";
-  
-  // Deterministic Google UID
-  let hash = 0;
-  for (let i = 0; i < cleanEmail.length; i++) {
-    hash = ((hash << 5) - hash) + cleanEmail.charCodeAt(i);
-    hash |= 0;
-  }
-  const generatedUid = `google-${Math.abs(hash).toString(36)}`;
-
-  const freshLearner: LearnerProfile = {
-    id: generatedUid,
-    name: cleanName,
-    email: cleanEmail,
-    avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=0284c7`,
-    firstLoginTimestamp: new Date().toISOString(),
-    lastLoginTimestamp: new Date().toISOString(),
-    streakDays: 1,
-    lastActiveDate: new Date().toISOString().split('T')[0],
-    currentModuleId: 1,      // Strictly Day 1
-    completedModules: [],    // Strictly empty, Day 2-15 locked!
-    assessmentScores: [],
-    completedLabs: [],
-    assignmentSubmissions: {},
-    earnedBadges: ['Security Starter'],
-    personalNotes: {},
-    bookmarkedModules: [],
-    simulatorStats: {},
-    xp: 100
-  };
-
-  if (isConfiguredWithValidKey()) {
-    try {
-      const learnerRef = doc(db, 'learners', generatedUid);
-      await setDoc(learnerRef, freshLearner, { merge: true });
-    } catch (err) {
-      console.warn("Firestore sync error:", err);
-    }
-  }
-
-  return freshLearner;
 };
 
 // Official Sign Out via Firebase

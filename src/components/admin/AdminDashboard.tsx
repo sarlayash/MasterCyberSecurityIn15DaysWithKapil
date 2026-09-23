@@ -20,7 +20,8 @@ import {
   RefreshCw,
   Mail,
   Calendar,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { LearnerProfile, Announcement } from '../../types';
@@ -185,6 +186,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoutAdmin })
       storageService.resetSpecificLearner(learnerId);
       refreshLearners();
       alert(`Progress reset for ${target.name}. All days 02-15 are locked again.`);
+    }
+  };
+
+  const handleDeleteLearner = (learnerId: string) => {
+    const target = learnersList.find(l => l.id === learnerId);
+    if (!target) return;
+
+    if (confirm(`Are you sure you want to permanently remove learner record for "${target.name}" (${target.email})? This action cannot be undone.`)) {
+      storageService.deleteSpecificLearner(learnerId);
+      refreshLearners();
+      alert(`Learner ${target.name} has been removed.`);
     }
   };
 
@@ -513,13 +525,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogoutAdmin })
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleResetLearner(selectedLearner.id)}
-                        className="p-2 rounded-lg bg-red-950/60 border border-red-500/40 text-red-300 hover:bg-red-900/60 transition-colors cursor-pointer"
-                        title="Reset Learner Progress to Day 01"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleResetLearner(selectedLearner.id)}
+                          className="p-2 rounded-lg bg-amber-950/60 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60 transition-colors cursor-pointer"
+                          title="Reset Learner Progress to Day 01"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLearner(selectedLearner.id)}
+                          className="p-2 rounded-lg bg-red-950/60 border border-red-500/40 text-red-300 hover:bg-red-900/60 transition-colors cursor-pointer"
+                          title="Permanently Delete Learner Record"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Real Metrics Breakdown Grid */}
