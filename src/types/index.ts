@@ -26,6 +26,19 @@ export interface LearnerProfile {
   ethicalHackingSubmissions?: Record<number, AssignmentSubmission>;
   ethicalHackingNotes?: Record<number, string>;
   ethicalHackingBookmarks?: number[];
+  moduleCompletionTimestamps?: Record<number, string>;
+}
+
+export interface ModuleLockStatus {
+  isUnlocked: boolean;
+  isWaitingWindow: boolean;
+  reason?: string;
+  previousDayCompleted: boolean;
+  completedAt?: string;
+  unlockTimestamp?: number;
+  remainingMs?: number;
+  formattedRemainingTime?: string;
+  previousModuleId?: number;
 }
 
 export interface SimulatorMetric {

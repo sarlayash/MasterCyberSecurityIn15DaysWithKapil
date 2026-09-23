@@ -1,4 +1,4 @@
-import { LearnerProfile, Announcement, AssignmentSubmission, TrackType, ModuleData } from '../types';
+import { LearnerProfile, Announcement, AssignmentSubmission, TrackType, ModuleData, ModuleLockStatus } from '../types';
 import { syncLearnerToFirestore } from './firebase';
 import { MODULES_DATA } from '../data/modulesData';
 import { ETHICAL_HACKING_MODULES_DATA } from '../data/ethicalHackingModulesData';
@@ -173,16 +173,112 @@ export const storageService = {
     return track === 'ethical-hacking' ? ETHICAL_HACKING_MODULES_DATA : MODULES_DATA;
   },
 
-  isModuleUnlocked(moduleId: number, completedModules: number[]): boolean {
-    if (moduleId === 1 || moduleId === 101) return true; // Day 1 for either track is always unlocked!
-    // Day N is unlocked ONLY IF Day N-1 has been successfully completed!
-    return completedModules.includes(moduleId - 1);
+  getModuleLockStatus(moduleId: number, learner?: LearnerProfile | null): ModuleLockStatus {
+    // Day 1 for Cyber Security (1) and Day 1 for Ethical Hacking (101) are unlocked immediately
+    if (moduleId === 1 || moduleId === 101) {
+      return {
+        isUnlocked: true,
+        isWaitingWindow: false,
+        previousDayCompleted: true
+      };
+    }
+
+    const user = learner || this.getLearner();
+    if (!user) {
+      return {
+        isUnlocked: false,
+        isWaitingWindow: false,
+        previousDayCompleted: false,
+        reason: 'Please sign in to view this module.'
+      };
+    }
+
+    const prevModuleId = moduleId - 1;
+    const completedList = user.completedModules || [];
+    const prevCompleted = completedList.includes(prevModuleId);
+
+    if (!prevCompleted) {
+      const prevDayLabel = prevModuleId > 100 
+        ? `Day ${prevModuleId - 100 < 10 ? '0' : ''}${prevModuleId - 100}` 
+        : `Day ${prevModuleId < 10 ? '0' : ''}${prevModuleId}`;
+      return {
+        isUnlocked: false,
+        isWaitingWindow: false,
+        previousDayCompleted: false,
+        previousModuleId: prevModuleId,
+        reason: `Complete ${prevDayLabel} first to unlock this day.`
+      };
+    }
+
+    // Previous day is completed! Now verify the 24-hour window
+    let completedAt = user.moduleCompletionTimestamps?.[prevModuleId];
+    if (!completedAt) {
+      if (user.assignmentSubmissions?.[prevModuleId]?.submittedAt) {
+        completedAt = user.assignmentSubmissions[prevModuleId].submittedAt;
+      } else if (user.ethicalHackingSubmissions?.[prevModuleId]?.submittedAt) {
+        completedAt = user.ethicalHackingSubmissions[prevModuleId].submittedAt;
+      }
+    }
+
+    // If still no completion timestamp recorded, default to first login timestamp
+    if (!completedAt) {
+      completedAt = user.firstLoginTimestamp || new Date().toISOString();
+    }
+
+    const completionTime = new Date(completedAt).getTime();
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24-hour window required
+    const unlockTime = (isNaN(completionTime) ? Date.now() - COOLDOWN_MS : completionTime) + COOLDOWN_MS;
+    const now = Date.now();
+    const remainingMs = Math.max(0, unlockTime - now);
+
+    if (remainingMs > 0) {
+      const totalHours = Math.floor(remainingMs / (1000 * 60 * 60));
+      const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remainingMs % (1000 * 60)) / 1000);
+      const formattedRemainingTime = totalHours > 0 
+        ? `${totalHours}h ${minutes}m` 
+        : `${minutes}m ${seconds}s`;
+
+      return {
+        isUnlocked: false,
+        isWaitingWindow: true,
+        previousDayCompleted: true,
+        completedAt,
+        unlockTimestamp: unlockTime,
+        remainingMs,
+        formattedRemainingTime,
+        previousModuleId: prevModuleId,
+        reason: `24-hour window active. Available in ${formattedRemainingTime}.`
+      };
+    }
+
+    return {
+      isUnlocked: true,
+      isWaitingWindow: false,
+      previousDayCompleted: true,
+      completedAt,
+      previousModuleId: prevModuleId
+    };
+  },
+
+  isModuleUnlocked(moduleId: number, completedModules: number[], learner?: LearnerProfile | null): boolean {
+    if (moduleId === 1 || moduleId === 101) return true;
+    const user = learner || this.getLearner();
+    if (!user) {
+      return completedModules.includes(moduleId - 1);
+    }
+    return this.getModuleLockStatus(moduleId, user).isUnlocked;
   },
 
   updateModuleProgress(moduleId: number, completed: boolean): LearnerProfile | null {
     const learner = this.getLearner();
     if (!learner) return null;
     if (completed) {
+      learner.moduleCompletionTimestamps = learner.moduleCompletionTimestamps || {};
+      if (!learner.moduleCompletionTimestamps[moduleId]) {
+        learner.moduleCompletionTimestamps[moduleId] = new Date().toISOString();
+      }
+
       if (!learner.completedModules.includes(moduleId)) {
         learner.completedModules.push(moduleId);
         learner.xp += 150;
@@ -198,6 +294,9 @@ export const storageService = {
       }
     } else {
       learner.completedModules = learner.completedModules.filter(m => m !== moduleId);
+      if (learner.moduleCompletionTimestamps) {
+        delete learner.moduleCompletionTimestamps[moduleId];
+      }
       if (moduleId >= 101 && learner.ethicalHackingCompletedModules) {
         learner.ethicalHackingCompletedModules = learner.ethicalHackingCompletedModules.filter(m => m !== moduleId);
       }
@@ -216,9 +315,13 @@ export const storageService = {
   submitAssignment(moduleId: number, responseText: string): AssignmentSubmission | null {
     const learner = this.getLearner();
     if (!learner) return null;
+    const nowIso = new Date().toISOString();
+    learner.moduleCompletionTimestamps = learner.moduleCompletionTimestamps || {};
+    learner.moduleCompletionTimestamps[moduleId] = nowIso;
+
     const submission: AssignmentSubmission = {
       moduleId,
-      submittedAt: new Date().toISOString(),
+      submittedAt: nowIso,
       status: 'submitted',
       score: 95, // Auto-assessed baseline for demo
       maxScore: 100,

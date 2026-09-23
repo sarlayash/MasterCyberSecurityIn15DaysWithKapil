@@ -15,11 +15,13 @@ import {
   Compass,
   FileCheck,
   Zap,
-  Target
+  Target,
+  Clock
 } from 'lucide-react';
 import { LearnerProfile } from '../../types';
 import { calculateCyberReadiness, calculateCyberPerformanceIndex, READINESS_LEVELS } from '../../services/scoringEngine';
 import { generateLearningRecommendations } from '../../services/recommendationEngine';
+import { storageService } from '../../services/storageService';
 
 interface LearnerDashboardProps {
   learner: LearnerProfile;
@@ -39,6 +41,11 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
   const csCompletedCount = learner.completedModules.filter(id => id <= 15).length;
   const ehCompletedCount = (learner.ethicalHackingCompletedModules || learner.completedModules.filter(id => id >= 101)).length;
   const isCertificateEligible = (csCompletedCount >= 15 || ehCompletedCount >= 15) && readiness.overallPercentage >= 70;
+
+  const currentCsId = learner.currentModuleId || 1;
+  const currentEhId = learner.ethicalHackingCurrentModuleId || 101;
+  const csLockStatus = storageService.getModuleLockStatus(currentCsId, learner);
+  const ehLockStatus = storageService.getModuleLockStatus(currentEhId, learner);
 
   return (
     <div className="min-h-screen bg-[#030712] py-8 px-4 sm:px-6 lg:px-8 text-slate-100 pb-24">
@@ -202,11 +209,17 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
             </div>
 
             <div className="pt-2 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
-                Current: <strong className="text-white">Day {learner.currentModuleId}</strong>
-              </span>
+              <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                <span>Current: <strong className="text-white">Day {currentCsId}</strong></span>
+                {csLockStatus.isWaitingWindow && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[10px] animate-pulse">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>⏳ In {csLockStatus.formattedRemainingTime}</span>
+                  </span>
+                )}
+              </div>
               <button
-                onClick={() => onNavigateTab('curriculum', learner.currentModuleId || 1)}
+                onClick={() => onNavigateTab('curriculum', currentCsId)}
                 className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-500/20"
               >
                 <span>Continue Track</span>
@@ -249,11 +262,17 @@ export const LearnerDashboard: React.FC<LearnerDashboardProps> = ({
             </div>
 
             <div className="pt-2 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-mono">
-                Current: <strong className="text-white">Day {(learner.ethicalHackingCurrentModuleId || 101) - 100}</strong>
-              </span>
+              <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                <span>Current: <strong className="text-white">Day {currentEhId - 100}</strong></span>
+                {ehLockStatus.isWaitingWindow && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[10px] animate-pulse">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>⏳ In {ehLockStatus.formattedRemainingTime}</span>
+                  </span>
+                )}
+              </div>
               <button
-                onClick={() => onNavigateTab('curriculum', learner.ethicalHackingCurrentModuleId || 101)}
+                onClick={() => onNavigateTab('curriculum', currentEhId)}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-400 hover:to-rose-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-rose-500/20"
               >
                 <span>Enter Red Team</span>

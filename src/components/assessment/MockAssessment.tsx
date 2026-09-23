@@ -53,6 +53,15 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
   const [reviewMode, setReviewMode] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
+  // Periodic tick for refreshing cooldown countdowns in day selector
+  const [, setCooldownTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCooldownTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Countdown timer
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
@@ -423,7 +432,8 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                       : MODULES_DATA.find(m => m.id === actualModuleId);
                     
                     const topicMeta = DAY_TOPIC_MAPPING[dayNum];
-                    const isUnlocked = storageService.isModuleUnlocked(actualModuleId, learner.completedModules);
+                    const lockStatus = storageService.getModuleLockStatus(actualModuleId, learner);
+                    const isUnlocked = lockStatus.isUnlocked;
                     const isSelected = selectedDay === dayNum;
 
                     return (
@@ -437,6 +447,8 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                               : 'bg-amber-950/40 border-amber-400 shadow-lg shadow-amber-950/50'
                             : isUnlocked
                             ? 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                            : lockStatus.isWaitingWindow
+                            ? 'bg-amber-950/20 border-amber-900/40 hover:border-amber-500/50 hover:bg-slate-900/60'
                             : 'bg-slate-950/40 border-slate-900 opacity-60'
                         }`}
                       >
@@ -460,8 +472,26 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                         </div>
 
                         <div className="pt-2 flex items-center justify-between border-t border-slate-800 text-[11px]">
-                          <span className={isUnlocked ? 'text-emerald-400 font-mono' : 'text-slate-500 font-mono'}>
-                            {isUnlocked ? '✓ Unlocked' : '🔒 Day Lock'}
+                          <span className={
+                            isUnlocked 
+                              ? 'text-emerald-400 font-mono flex items-center gap-1' 
+                              : lockStatus.isWaitingWindow 
+                              ? 'text-amber-400 font-mono flex items-center gap-1 animate-pulse' 
+                              : 'text-slate-500 font-mono flex items-center gap-1'
+                          }>
+                            {isUnlocked ? (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                <span>Unlocked</span>
+                              </>
+                            ) : lockStatus.isWaitingWindow ? (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                                <span>⏳ In {lockStatus.formattedRemainingTime}</span>
+                              </>
+                            ) : (
+                              <span>🔒 Day Lock</span>
+                            )}
                           </span>
                           <span className={`font-bold flex items-center gap-1 ${
                             selectedTrack === 'ethical-hacking' ? 'text-rose-400' : 'text-amber-400'
@@ -475,18 +505,42 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
                   })}
                 </div>
 
-                <div className="pt-4 text-center">
-                  <button
-                    onClick={() => handleStartTest('DAY_ASSESSMENT', selectedDay, selectedTrack)}
-                    className={`px-8 py-3.5 rounded-xl text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl transition-all transform hover:-translate-y-0.5 cursor-pointer ${
-                      selectedTrack === 'ethical-hacking'
-                        ? 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 hover:from-red-400 hover:to-amber-400 shadow-rose-500/25'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-amber-500/25'
-                    }`}
-                  >
-                    Start Day {selectedDay < 10 ? `0${selectedDay}` : selectedDay} Mock Assessment (10 Questions)
-                  </button>
-                </div>
+                {(() => {
+                  const selectedActualId = selectedTrack === 'ethical-hacking' ? 100 + selectedDay : selectedDay;
+                  const selectedLockStatus = storageService.getModuleLockStatus(selectedActualId, learner);
+                  const isReady = selectedLockStatus.isUnlocked;
+
+                  return (
+                    <div className="pt-4 text-center space-y-2">
+                      <button
+                        disabled={!isReady}
+                        onClick={() => handleStartTest('DAY_ASSESSMENT', selectedDay, selectedTrack)}
+                        className={`px-8 py-3.5 rounded-xl text-slate-950 font-black text-xs uppercase tracking-wider shadow-xl transition-all transform ${
+                          isReady
+                            ? selectedTrack === 'ethical-hacking'
+                              ? 'bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 hover:from-red-400 hover:to-amber-400 shadow-rose-500/25 hover:-translate-y-0.5 cursor-pointer'
+                              : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-amber-500/25 hover:-translate-y-0.5 cursor-pointer'
+                            : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-80'
+                        }`}
+                      >
+                        {isReady ? (
+                          `Start Day ${selectedDay < 10 ? `0${selectedDay}` : selectedDay} Mock Assessment (10 Questions)`
+                        ) : selectedLockStatus.isWaitingWindow ? (
+                          `⏳ Day ${selectedDay < 10 ? `0${selectedDay}` : selectedDay} Unlocks in ${selectedLockStatus.formattedRemainingTime} (24h Cooldown)`
+                        ) : (
+                          `🔒 Complete Day ${selectedDay - 1 < 10 ? `0${selectedDay - 1}` : selectedDay - 1} First to Unlock Assessment`
+                        )}
+                      </button>
+                      {!isReady && (
+                        <p className="text-[11px] text-amber-400/90 font-mono">
+                          {selectedLockStatus.isWaitingWindow 
+                            ? `This day's assessment is locked under the 24-hour spaced learning cooldown window.` 
+                            : `Complete the previous day curriculum first to begin the 24-hour unlock timer.`}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

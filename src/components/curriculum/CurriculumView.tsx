@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { MODULES_DATA } from '../../data/modulesData';
 import { ETHICAL_HACKING_MODULES_DATA } from '../../data/ethicalHackingModulesData';
-import { LearnerProfile, ModuleData, Question, AssessmentAttempt, TrackType } from '../../types';
+import { LearnerProfile, ModuleData, Question, AssessmentAttempt, TrackType, ModuleLockStatus } from '../../types';
 import { storageService } from '../../services/storageService';
 import { getDayMockAssessment } from '../../data/questionBank';
 
@@ -56,14 +56,23 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
     ? ETHICAL_HACKING_MODULES_DATA 
     : MODULES_DATA;
 
+  // Real-time tick timer to refresh remaining countdowns every second
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [selectedModuleId, setSelectedModuleId] = useState<number>(() => {
     const modules = (initialModuleId >= 101 || (learner.activeTrack || storageService.getActiveTrack()) === 'ethical-hacking')
       ? ETHICAL_HACKING_MODULES_DATA 
       : MODULES_DATA;
-    if (storageService.isModuleUnlocked(initialModuleId, learner.completedModules) && modules.some(m => m.id === initialModuleId)) {
+    if (storageService.isModuleUnlocked(initialModuleId, learner.completedModules, learner) && modules.some(m => m.id === initialModuleId)) {
       return initialModuleId;
     }
-    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules));
+    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules, learner));
     return unlocked.length > 0 ? unlocked[unlocked.length - 1].id : modules[0].id;
   });
 
@@ -90,7 +99,7 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
     setSelectedTrack(newTrack);
     storageService.setActiveTrack(newTrack);
     const modules = newTrack === 'ethical-hacking' ? ETHICAL_HACKING_MODULES_DATA : MODULES_DATA;
-    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules));
+    const unlocked = modules.filter(m => storageService.isModuleUnlocked(m.id, learner.completedModules, learner));
     const targetId = unlocked.length > 0 ? unlocked[unlocked.length - 1].id : modules[0].id;
     setSelectedModuleId(targetId);
     setPersonalNoteText(learner.personalNotes[targetId] || '');
@@ -101,7 +110,8 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
   // Locking and celebration modals state
   const [lockedModalData, setLockedModalData] = useState<{
     targetModule: ModuleData;
-    requiredModule: ModuleData;
+    requiredModule?: ModuleData;
+    lockStatus: ModuleLockStatus;
   } | null>(null);
 
   const [unlockedCelebrationModal, setUnlockedCelebrationModal] = useState<{
@@ -115,12 +125,13 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
   const submission = learner.assignmentSubmissions[currentModule.id];
 
   const handleSelectModule = (id: number) => {
-    const isUnlocked = storageService.isModuleUnlocked(id, learner.completedModules);
-    if (!isUnlocked) {
+    const lockStatus = storageService.getModuleLockStatus(id, learner);
+    if (!lockStatus.isUnlocked) {
       const target = activeModules.find(m => m.id === id);
-      const required = activeModules.find(m => m.id === id - 1);
-      if (target && required) {
-        setLockedModalData({ targetModule: target, requiredModule: required });
+      const reqId = lockStatus.previousModuleId || id - 1;
+      const required = activeModules.find(m => m.id === reqId);
+      if (target) {
+        setLockedModalData({ targetModule: target, requiredModule: required, lockStatus });
       }
       return;
     }
@@ -384,7 +395,8 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
                   .map((m) => {
                     const active = m.id === currentModule.id;
                     const done = learner.completedModules.includes(m.id);
-                    const isUnlocked = storageService.isModuleUnlocked(m.id, learner.completedModules);
+                    const lockStatus = storageService.getModuleLockStatus(m.id, learner);
+                    const isUnlocked = lockStatus.isUnlocked;
 
                     return (
                       <button
@@ -392,7 +404,9 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
                         onClick={() => handleSelectModule(m.id)}
                         className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group ${
                           !isUnlocked
-                            ? 'bg-slate-950/40 border-slate-900 text-slate-500 opacity-60 hover:opacity-90 hover:border-slate-800 hover:bg-slate-900/40 cursor-pointer'
+                            ? lockStatus.isWaitingWindow
+                              ? 'bg-amber-950/20 border-amber-900/40 text-slate-300 hover:border-amber-500/50 hover:bg-slate-900 cursor-pointer'
+                              : 'bg-slate-950/40 border-slate-900 text-slate-500 opacity-60 hover:opacity-90 hover:border-slate-800 hover:bg-slate-900/40 cursor-pointer'
                             : active
                             ? 'bg-cyan-950/80 border-cyan-400 text-white shadow-md shadow-cyan-950/50'
                             : 'bg-slate-900/50 border-slate-800/80 text-slate-300 hover:bg-slate-900 hover:text-white'
@@ -400,14 +414,22 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
                       >
                         <div className="min-w-0 pr-2">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className={`text-[10px] font-mono font-bold ${!isUnlocked ? 'text-slate-600' : 'text-amber-400'}`}>
+                            <span className={`text-[10px] font-mono font-bold ${
+                              !isUnlocked 
+                                ? (lockStatus.isWaitingWindow ? 'text-amber-400' : 'text-slate-600') 
+                                : 'text-amber-400'
+                            }`}>
                               {m.dayNumber}
                             </span>
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded ${!isUnlocked ? 'bg-slate-950 text-slate-600' : 'bg-slate-800 text-slate-400'}`}>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded ${
+                              !isUnlocked 
+                                ? (lockStatus.isWaitingWindow ? 'bg-amber-950/60 text-amber-300 border border-amber-800/40' : 'bg-slate-950 text-slate-600') 
+                                : 'bg-slate-800 text-slate-400'
+                            }`}>
                               {m.category}
                             </span>
                           </div>
-                          <p className={`text-xs font-semibold truncate ${!isUnlocked ? 'text-slate-500 group-hover:text-slate-400' : ''}`}>
+                          <p className={`text-xs font-semibold truncate ${!isUnlocked && !lockStatus.isWaitingWindow ? 'text-slate-500 group-hover:text-slate-400' : ''}`}>
                             {m.title}
                           </p>
                         </div>
@@ -416,9 +438,17 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
                           <div className="flex items-center gap-1 text-emerald-400 shrink-0">
                             <CheckCircle className="w-4 h-4" />
                           </div>
+                        ) : lockStatus.isWaitingWindow ? (
+                          <div 
+                            title={`24-hour window active. Available in ${lockStatus.formattedRemainingTime}`}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/60 text-amber-300 text-[10px] font-mono shrink-0 shadow-sm animate-pulse"
+                          >
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            <span>⏳ {lockStatus.formattedRemainingTime}</span>
+                          </div>
                         ) : !isUnlocked ? (
-                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800/80 text-amber-500/70 text-[10px] font-mono shrink-0">
-                            <Lock className="w-3 h-3 text-amber-500/80" />
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800/80 text-slate-500 text-[10px] font-mono shrink-0">
+                            <Lock className="w-3 h-3 text-slate-600" />
                             <span>LOCKED</span>
                           </div>
                         ) : (
@@ -1090,154 +1120,273 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
       </div>
 
       {/* MODAL 1: LOCKED DAY BARRIER MODAL */}
-      {lockedModalData && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="max-w-md w-full bg-[#081124] border border-amber-500/50 rounded-3xl p-6 sm:p-7 shadow-2xl relative">
-            <button
-              onClick={() => setLockedModalData(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {lockedModalData && (() => {
+        const liveLockStatus = storageService.getModuleLockStatus(lockedModalData.targetModule.id, learner);
+        const isCooldown = liveLockStatus.isWaitingWindow;
+        const reqModule = lockedModalData.requiredModule || activeModules.find(m => m.id === liveLockStatus.previousModuleId);
 
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 mx-auto">
-              <Lock className="w-7 h-7" />
-            </div>
-
-            <div className="text-center space-y-2 mb-6">
-              <span className="text-[11px] font-mono text-amber-400 uppercase tracking-widest font-bold">
-                Sequential Progression Enforced
-              </span>
-              <h3 className="text-xl font-black text-white">
-                {lockedModalData.targetModule.dayNumber} is Locked
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                In <span className="text-cyan-400 font-semibold">Cyber Security Zero-To-Infinity</span>, all learners build real cybersecurity competency step-by-step starting strictly from Day 01. Random day jumping is restricted.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 mb-6 space-y-2">
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">
-                Unlock Requirement:
-              </span>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-800/80 flex items-center justify-center text-cyan-400 font-mono text-xs font-bold shrink-0">
-                  {lockedModalData.requiredModule.id < 10 ? `0${lockedModalData.requiredModule.id}` : lockedModalData.requiredModule.id}
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">
-                    {lockedModalData.requiredModule.title}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Must be completed first to unlock {lockedModalData.targetModule.dayNumber}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  const reqId = lockedModalData.requiredModule.id;
-                  setLockedModalData(null);
-                  handleSelectModule(reqId);
-                }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
-              >
-                <span>Go to {lockedModalData.requiredModule.dayNumber} Now</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className={`max-w-lg w-full bg-[#081124] border ${isCooldown ? 'border-amber-500/50 shadow-amber-500/20' : 'border-amber-500/50 shadow-amber-500/20'} rounded-3xl p-6 sm:p-7 shadow-2xl relative`}>
               <button
                 onClick={() => setLockedModalData(null)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-medium transition-colors"
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
-                Stay on Current Day
+                <X className="w-5 h-5" />
               </button>
+
+              {isCooldown ? (
+                // 24-HOUR COOLDOWN WINDOW ACTIVE
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-4 mx-auto animate-pulse">
+                    <Clock className="w-8 h-8 text-amber-400" />
+                  </div>
+
+                  <div className="text-center space-y-2 mb-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/50 text-amber-300 text-xs font-mono font-bold tracking-wider uppercase">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span>24-Hour Cooldown Window Active</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black text-white">
+                      {lockedModalData.targetModule.dayNumber} Unlocks in {liveLockStatus.formattedRemainingTime}
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+                      Previous day was successfully completed! Each new day unlocks strictly after a <strong className="text-cyan-400">24-hour spaced learning interval</strong> to ensure deep concept assimilation and retention.
+                    </p>
+                  </div>
+
+                  {/* Dynamic Countdown Box */}
+                  <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 mb-5 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-slate-400">Remaining Cooldown:</span>
+                      <span className="text-amber-400 font-bold text-sm tracking-widest">{liveLockStatus.formattedRemainingTime}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-left pt-2 border-t border-slate-800">
+                      <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Previous Day</span>
+                        <span className="text-xs font-bold text-white truncate block">
+                          {reqModule?.dayNumber || `Day ${liveLockStatus.previousModuleId}`} Completed
+                        </span>
+                        {liveLockStatus.completedAt && (
+                          <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">
+                            ✓ {new Date(liveLockStatus.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Unlocks Automatically</span>
+                        <span className="text-xs font-bold text-cyan-300 truncate block">
+                          {liveLockStatus.unlockTimestamp ? new Date(liveLockStatus.unlockTimestamp).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'In 24h'}
+                        </span>
+                        {liveLockStatus.unlockTimestamp && (
+                          <span className="text-[10px] text-cyan-400 font-mono block mt-0.5">
+                            @ {new Date(liveLockStatus.unlockTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-900/50 text-[11px] text-cyan-200/90 leading-relaxed">
+                      💡 <strong>While waiting:</strong> Reinforce your skills! Take the Day Mock Assessment to claim your Badge, review the Case Studies, or run hands-on Virtual Labs.
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {reqModule && (
+                      <button
+                        onClick={() => {
+                          const reqId = reqModule.id;
+                          setLockedModalData(null);
+                          handleSelectModule(reqId);
+                          setActiveTab('assessment');
+                        }}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>Take {reqModule.dayNumber} Mock Assessment (Claim Badge)</span>
+                      </button>
+                    )}
+                    {reqModule && (
+                      <button
+                        onClick={() => {
+                          const reqId = reqModule.id;
+                          setLockedModalData(null);
+                          handleSelectModule(reqId);
+                          setActiveTab('notes');
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <BookOpen className="w-4 h-4 text-slate-400" />
+                        <span>Review {reqModule.dayNumber} Notes &amp; Indian Attack Studies</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setLockedModalData(null)}
+                      className="w-full py-2 rounded-xl text-slate-500 hover:text-slate-300 text-xs transition-colors"
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                </>
+              ) : (
+                // PREVIOUS DAY NOT COMPLETED YET
+                <>
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 mx-auto">
+                    <Lock className="w-7 h-7" />
+                  </div>
+
+                  <div className="text-center space-y-2 mb-6">
+                    <span className="text-[11px] font-mono text-amber-400 uppercase tracking-widest font-bold">
+                      Sequential Progression Enforced
+                    </span>
+                    <h3 className="text-xl font-black text-white">
+                      {lockedModalData.targetModule.dayNumber} is Locked
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      In <span className="text-cyan-400 font-semibold">Cyber Security Zero-To-Infinity</span>, all learners build real cybersecurity competency step-by-step. Each day unlocks strictly after completing the previous day and waiting through its 24-hour absorption window.
+                    </p>
+                  </div>
+
+                  {reqModule && (
+                    <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 mb-6 space-y-2">
+                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">
+                        Unlock Requirement:
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-800/80 flex items-center justify-center text-cyan-400 font-mono text-xs font-bold shrink-0">
+                          {reqModule.id < 10 ? `0${reqModule.id}` : reqModule.id}
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-white block">
+                            {reqModule.title}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Must be completed first to trigger the 24-hour unlock timer for {lockedModalData.targetModule.dayNumber}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {reqModule && (
+                      <button
+                        onClick={() => {
+                          const reqId = reqModule.id;
+                          setLockedModalData(null);
+                          handleSelectModule(reqId);
+                        }}
+                        className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        <span>Go to {reqModule.dayNumber} Now</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setLockedModalData(null)}
+                      className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs font-medium transition-colors"
+                    >
+                      Stay on Current Day
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL 2: UNLOCK CELEBRATION MODAL */}
-      {unlockedCelebrationModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="max-w-md w-full bg-[#081124] border border-emerald-500/50 rounded-3xl p-6 sm:p-7 shadow-2xl relative text-center">
-            <button
-              onClick={() => setUnlockedCelebrationModal(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {unlockedCelebrationModal && (() => {
+        const nextMod = unlockedCelebrationModal.nextModule;
+        const nextLockStatus = nextMod ? storageService.getModuleLockStatus(nextMod.id, learner) : null;
 
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center text-emerald-400 mb-4 mx-auto">
-              <Sparkles className="w-8 h-8 text-emerald-400" />
-            </div>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+            <div className="max-w-md w-full bg-[#081124] border border-emerald-500/50 rounded-3xl p-6 sm:p-7 shadow-2xl relative text-center">
+              <button
+                onClick={() => setUnlockedCelebrationModal(null)}
+                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
-            <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-widest font-bold block mb-1">
-              Day Completed • Progress Recorded
-            </span>
-            <h3 className="text-xl sm:text-2xl font-black text-white mb-2">
-              {unlockedCelebrationModal.completedModule.dayNumber} Mastered!
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-6">
-              Outstanding work! You earned <span className="text-cyan-400 font-bold font-mono">+150 XP</span>. Your Cyber Readiness Meter and Cyber Performance Index have been updated.
-            </p>
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 flex items-center justify-center text-emerald-400 mb-4 mx-auto">
+                <Sparkles className="w-8 h-8 text-emerald-400" />
+              </div>
 
-            {unlockedCelebrationModal.nextModule ? (
-              <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 text-left mb-6">
-                <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block font-bold mb-1">
-                  🔓 NEXT DAY UNLOCKED:
-                </span>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-cyan-500 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0">
-                    {unlockedCelebrationModal.nextModule.id < 10 ? `0${unlockedCelebrationModal.nextModule.id}` : unlockedCelebrationModal.nextModule.id}
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-white block">
-                      {unlockedCelebrationModal.nextModule.dayNumber}: {unlockedCelebrationModal.nextModule.title}
+              <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-widest font-bold block mb-1">
+                Day Completed • Progress Recorded
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white mb-2">
+                {unlockedCelebrationModal.completedModule.dayNumber} Mastered!
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed mb-6">
+                Outstanding work! You earned <span className="text-cyan-400 font-bold font-mono">+150 XP</span>. Your Cyber Readiness Meter and Cyber Performance Index have been updated.
+              </p>
+
+              {nextMod ? (
+                <div className="p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 text-left mb-6 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block font-bold">
+                      ⏳ 24-HOUR COOLDOWN WINDOW STARTED:
                     </span>
-                    <span className="text-[10px] text-slate-400">
-                      {unlockedCelebrationModal.nextModule.category} • {unlockedCelebrationModal.nextModule.estimatedMinutes} mins
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold">
+                      {nextLockStatus?.formattedRemainingTime || '24h 00m'}
                     </span>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-900 border border-cyan-500/50 text-cyan-300 flex items-center justify-center font-bold text-xs shrink-0">
+                      {nextMod.id < 10 ? `0${nextMod.id}` : nextMod.id}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        {nextMod.dayNumber}: {nextMod.title}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        Unlocks in {nextLockStatus?.formattedRemainingTime || '24 hours'} after deep concept absorption
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-800 leading-normal">
+                    🎯 <strong>Next Action:</strong> Take the Day Mock Assessment below with ≥70% score to earn your official downloadable badge and LOR credit!
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-center mb-6">
-                <span className="text-xs font-bold text-amber-300 block">
-                  🎓 All 15 Days Completed!
-                </span>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  You have unlocked the Capstone Assessment & Official SarlaYash Certificate.
-                </p>
-              </div>
-            )}
+              ) : (
+                <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-center mb-6">
+                  <span className="text-xs font-bold text-amber-300 block">
+                    🎓 All 15 Days Completed!
+                  </span>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    You have unlocked the Capstone Assessment &amp; Official SarlaYash Certificate.
+                  </p>
+                </div>
+              )}
 
-            <div className="space-y-2">
-              {unlockedCelebrationModal.nextModule && (
+              <div className="space-y-2">
                 <button
                   onClick={() => {
-                    const nextId = unlockedCelebrationModal.nextModule!.id;
                     setUnlockedCelebrationModal(null);
-                    handleSelectModule(nextId);
-                    setActiveTab('notes');
+                    setActiveTab('assessment');
                   }}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2"
                 >
-                  <span>Proceed to {unlockedCelebrationModal.nextModule.dayNumber}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <Award className="w-4 h-4" />
+                  <span>Take Day Mock Assessment (Claim Badge)</span>
                 </button>
-              )}
-              <button
-                onClick={() => setUnlockedCelebrationModal(null)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
-              >
-                Stay on Current Day
-              </button>
+                <button
+                  onClick={() => setUnlockedCelebrationModal(null)}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+                >
+                  Stay on Current Day
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
