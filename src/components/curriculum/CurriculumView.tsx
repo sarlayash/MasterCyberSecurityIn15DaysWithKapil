@@ -107,7 +107,9 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
 
   const handleCompleteAndUnlockNext = (moduleId: number) => {
     const updated = storageService.updateModuleProgress(moduleId, true);
-    onUpdateLearner(updated);
+    if (updated) {
+      onUpdateLearner(updated);
+    }
 
     try {
       confetti({
@@ -134,7 +136,9 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
       handleCompleteAndUnlockNext(currentModule.id);
     } else {
       const updated = storageService.updateModuleProgress(currentModule.id, false);
-      onUpdateLearner(updated);
+      if (updated) {
+        onUpdateLearner(updated);
+      }
     }
   };
 
@@ -152,7 +156,9 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
   const handleSavePersonalNote = () => {
     storageService.savePersonalNote(currentModule.id, personalNoteText);
     const updated = storageService.getLearner();
-    onUpdateLearner(updated);
+    if (updated) {
+      onUpdateLearner(updated);
+    }
     alert('Personal note saved for ' + currentModule.dayNumber);
   };
 
@@ -201,7 +207,9 @@ export const CurriculumView: React.FC<CurriculumViewProps> = ({
       handleCompleteAndUnlockNext(currentModule.id);
     } else {
       const updated = storageService.getLearner();
-      onUpdateLearner(updated);
+      if (updated) {
+        onUpdateLearner(updated);
+      }
     }
   };
 

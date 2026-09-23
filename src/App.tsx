@@ -108,18 +108,27 @@ export const App: React.FC = () => {
           <LandingPage
             onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
             onExploreAsGuest={() => {
-              if (!learner) setLearner(DEFAULT_LEARNER);
-              setCurrentTab('dashboard');
+              if (learner) {
+                setCurrentTab('dashboard');
+              } else {
+                setIsGoogleAuthOpen(true);
+              }
             }}
             onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
             onSelectModule={(modId) => {
-              if (!learner) setLearner(DEFAULT_LEARNER);
-              setSelectedModuleId(modId);
-              setCurrentTab('curriculum');
+              if (learner) {
+                setSelectedModuleId(modId);
+                setCurrentTab('curriculum');
+              } else {
+                setIsGoogleAuthOpen(true);
+              }
             }}
             onLaunchSimulator={(simId) => {
-              if (!learner) setLearner(DEFAULT_LEARNER);
-              setCurrentTab(`sim-${simId}`);
+              if (learner) {
+                setCurrentTab(`sim-${simId}`);
+              } else {
+                setIsGoogleAuthOpen(true);
+              }
             }}
             onOpenTour={() => setIsTourOpen(true)}
           />

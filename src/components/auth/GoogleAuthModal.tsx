@@ -48,8 +48,14 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
       if (err.code === 'auth/missing-api-key') {
         setShowConfig(true);
         setErrorMessage("Firebase Web API key is required. Paste your Web App config below to activate Google sign-in.");
+      } else if (err.code === 'auth/popup-blocked') {
+        setErrorMessage("Google Sign-In pop-up was blocked by your browser. Please look for the pop-up blocked icon in your browser address bar, click 'Always allow pop-ups', and try again.");
       } else if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage("Google Sign-In popup was closed before completing authentication. Please try again.");
+        setErrorMessage("Google Sign-In pop-up was closed before completing authentication. Please click below to try again.");
+      } else if (err.code === 'auth/timeout') {
+        setErrorMessage("Google Sign-In is taking longer than expected. If using Chrome Incognito mode, third-party cookies or pop-ups may be blocked. Please ensure pop-ups are allowed or click below to retry.");
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        setErrorMessage("Previous sign-in request was superseded. Please click below to try again.");
       } else if (err.code === 'auth/unauthorized-domain') {
         setErrorMessage("Domain 'sarlayash.github.io' (or 'localhost') is not authorized. In Firebase Console, go to Authentication > Settings > Authorized Domains > Add domain.");
       } else if (err.code === 'auth/operation-not-allowed') {
@@ -134,12 +140,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
               <button
                 onClick={handleGoogleSignInPopup}
                 disabled={isLoading}
-                className="w-full py-4 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] cursor-pointer disabled:opacity-50"
+                className="w-full py-4 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-xl flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] cursor-pointer disabled:opacity-75"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-5 h-5 text-slate-900 animate-spin" />
-                    <span>Connecting to Google OAuth...</span>
+                    <Loader2 className="w-5 h-5 text-cyan-600 animate-spin" />
+                    <span>Waiting for Google Account...</span>
                   </>
                 ) : (
                   <>
@@ -165,6 +171,21 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
                   </>
                 )}
               </button>
+
+              {isLoading && (
+                <div className="flex items-center justify-between px-2 pt-1 text-xs text-slate-400">
+                  <span className="text-[11px] text-cyan-300 animate-pulse">
+                    Pop-up window opened. Pick account to continue.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsLoading(false)}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                  >
+                    Cancel / Retry
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Zero Fake Accounts Guarantee */}

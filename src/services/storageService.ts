@@ -47,22 +47,28 @@ export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
 ];
 
 export const storageService = {
-  getLearner(): LearnerProfile {
+  getLearner(): LearnerProfile | null {
     try {
       const data = localStorage.getItem(STORAGE_KEY_LEARNER);
       if (data) {
         const parsed = JSON.parse(data);
-        // If it's a legacy unverified dummy bypass account, purge it immediately
-        if (parsed.id?.startsWith('google-') || parsed.email === 'ka20154112@wipro.com') {
+        // Strictly purge any mock / placeholder / unverified dummy bypass accounts
+        if (
+          !parsed ||
+          parsed.id === 'learner-initial' ||
+          parsed.id?.startsWith('google-') || 
+          parsed.email === 'ka20154112@wipro.com' ||
+          parsed.email === 'learner@sarlayash.org'
+        ) {
           localStorage.removeItem(STORAGE_KEY_LEARNER);
-          return DEFAULT_LEARNER;
+          return null;
         }
         return parsed;
       }
     } catch (e) {
       console.error("Storage read error", e);
     }
-    return DEFAULT_LEARNER;
+    return null;
   },
 
   getAllRegisteredLearners(): LearnerProfile[] {
@@ -142,8 +148,9 @@ export const storageService = {
     return completedModules.includes(moduleId - 1);
   },
 
-  updateModuleProgress(moduleId: number, completed: boolean): LearnerProfile {
+  updateModuleProgress(moduleId: number, completed: boolean): LearnerProfile | null {
     const learner = this.getLearner();
+    if (!learner) return null;
     if (completed) {
       if (!learner.completedModules.includes(moduleId)) {
         learner.completedModules.push(moduleId);
@@ -159,12 +166,14 @@ export const storageService = {
 
   savePersonalNote(moduleId: number, noteText: string): void {
     const learner = this.getLearner();
+    if (!learner) return;
     learner.personalNotes[moduleId] = noteText;
     this.saveLearner(learner);
   },
 
-  submitAssignment(moduleId: number, responseText: string): AssignmentSubmission {
+  submitAssignment(moduleId: number, responseText: string): AssignmentSubmission | null {
     const learner = this.getLearner();
+    if (!learner) return null;
     const submission: AssignmentSubmission = {
       moduleId,
       submittedAt: new Date().toISOString(),
@@ -182,6 +191,7 @@ export const storageService = {
 
   recordSimulatorRun(simKey: string, score: number): void {
     const learner = this.getLearner();
+    if (!learner) return;
     const prev = learner.simulatorStats[simKey] || { runsCount: 0, lastRunTimestamp: '', score: 0 };
     learner.simulatorStats[simKey] = {
       runsCount: prev.runsCount + 1,
@@ -197,6 +207,7 @@ export const storageService = {
 
   recordAssessmentAttempt(attempt: LearnerProfile['assessmentScores'][0]): void {
     const learner = this.getLearner();
+    if (!learner) return;
     learner.assessmentScores.unshift(attempt);
     learner.xp += 250;
     if (attempt.percentage >= 80 && !learner.earnedBadges.includes("Assessment Master")) {

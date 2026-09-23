@@ -163,7 +163,9 @@ export const MockAssessment: React.FC<MockAssessmentProps> = ({
     }
 
     const updated = storageService.getLearner();
-    onUpdateLearner(updated);
+    if (updated) {
+      onUpdateLearner(updated);
+    }
 
     try {
       confetti({
